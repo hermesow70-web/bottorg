@@ -1,38 +1,22 @@
-import logging
-import os
 import asyncio
-from datetime import datetime
-from db import load_users, load_banned
 from config import ADMIN_IDS
+from database import load_users, load_banned
 
-os.makedirs("logs", exist_ok=True)
+async def notify_admins(bot, text, reply_markup=None):
+    for admin_id in ADMIN_IDS:
+        try:
+            await bot.send_message(admin_id, text, reply_markup=reply_markup, parse_mode="Markdown")
+        except:
+            pass
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.FileHandler(f"logs/bot_{datetime.now().strftime('%Y%m%d')}.log", encoding="utf-8"),
-        logging.StreamHandler()
-    ]
-)
-
-logger = logging.getLogger(__name__)
-
-async def notify_all_users(bot, text, reply_markup=None):
+async def notify_all_users(bot, text):
     users = load_users()
     banned = load_banned()
     for user in users:
         if user["id"] in banned:
             continue
         try:
-            await bot.send_message(user["id"], text, reply_markup=reply_markup)
+            await bot.send_message(user["id"], text, parse_mode="Markdown")
         except:
             pass
         await asyncio.sleep(0.05)
-
-async def notify_admins(bot, text, reply_markup=None):
-    for admin_id in ADMIN_IDS:
-        try:
-            await bot.send_message(admin_id, text, reply_markup=reply_markup)
-        except:
-            pass
