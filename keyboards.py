@@ -100,3 +100,14 @@ def pagination_keyboard(page, total, prefix):
     if page < total:
         buttons.append(InlineKeyboardButton(text="ВПЕРЁД ▶️", callback_data=f"{prefix}_{page+1}"))
     return InlineKeyboardMarkup(inline_keyboard=[buttons, [InlineKeyboardButton(text="🏠 ГЛАВНОЕ МЕНЮ", callback_data="to_main")]])
+# Добавь в конец файла keyboards.py:
+
+def pagination_keyboard(page, total, prefix):
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+    buttons = []
+    if page > 1:
+        buttons.append(InlineKeyboardButton(text="◀️ Назад", callback_data=f"{prefix}_{page-1}"))
+    buttons.append(InlineKeyboardButton(text=f"{page}/{total}", callback_data="ignore"))
+    if page < total:
+        buttons.append(InlineKeyboardButton(text="Вперёд ▶️", callback_data=f"{prefix}_{page+1}"))
+    return InlineKeyboardMarkup(inline_keyboard=[buttons, [InlineKeyboardButton(text="🏠 Главное меню", callback_data="to_main")]])
