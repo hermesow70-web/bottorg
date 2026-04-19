@@ -18,19 +18,14 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-async def notify_all_users(bot, text, reply_markup=None, photo=None, video=None):
+async def notify_all_users(bot, text, reply_markup=None):
     users = load_users()
     banned = load_banned()
     for user in users:
         if user["id"] in banned:
             continue
         try:
-            if photo:
-                await bot.send_photo(user["id"], photo=photo, caption=text, reply_markup=reply_markup)
-            elif video:
-                await bot.send_video(user["id"], video=video, caption=text, reply_markup=reply_markup)
-            else:
-                await bot.send_message(user["id"], text, reply_markup=reply_markup)
+            await bot.send_message(user["id"], text, reply_markup=reply_markup)
         except:
             pass
         await asyncio.sleep(0.05)
