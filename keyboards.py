@@ -9,7 +9,7 @@ def main_keyboard():
     ]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
 
-def admin_main_keyboard():
+def admin_keyboard():
     kb = [
         [KeyboardButton(text="👥 БАН/РАЗБАН")],
         [KeyboardButton(text="📋 СПИСОК ЖАЛОБ")],
