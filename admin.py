@@ -529,7 +529,7 @@ async def set_rating_value(message: types.Message, state: FSMContext):
         )
         
         await notify_admins(
-            callback.bot,
+            message.bot,
             f"⭐ **Админ обновил рейтинг** пользователя @{user['username']}\n"
             f"🏆 **Новое место:** {rating if rating > 0 else 'не в рейтинге'}"
         )
