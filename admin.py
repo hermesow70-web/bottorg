@@ -349,7 +349,8 @@ async def view_user_result(message: types.Message, state: FSMContext):
     if user.get("rating_count", 0) > 0:
         avg_score = user.get("rating_score", 0) / user.get("rating_count", 0)
     
-    stars = "⭐" * round(avg_score) if avg_score > 0 else "нет"
+    stars_count = round(avg_score)
+    stars = "⭐" * stars_count if stars_count > 0 else "нет"
     
     withdraws = load_withdraws()
     user_withdraws = [w for w in withdraws if w["user_id"] == user["id"]]
@@ -521,9 +522,10 @@ async def set_rating_value(message: types.Message, state: FSMContext):
         
         update_user_by_username(username, {"rating": rating})
         
+        rating_text = "не в рейтинге" if rating == 0 else str(rating)
         await message.answer(
             f"✅ **Рейтинг обновлён** для пользователя @{user['username']}\n"
-            f"🏆 **Новое место:** {rating if rating > 0 else 'не в рейтинге'}",
+            f"🏆 **Новое место:** {rating_text}",
             parse_mode="Markdown",
             reply_markup=admin_keyboard()
         )
@@ -531,7 +533,7 @@ async def set_rating_value(message: types.Message, state: FSMContext):
         await notify_admins(
             message.bot,
             f"⭐ **Админ обновил рейтинг** пользователя @{user['username']}\n"
-            f"🏆 **Новое место:** {rating if rating > 0 else 'не в рейтинге'}"
+            f"🏆 **Новое место:** {rating_text}"
         )
         
         await state.clear()
@@ -549,9 +551,16 @@ async def list_reviews(message: types.Message):
     reviews.reverse()
     for r in reviews[:20]:
         stars = "⭐" * r["rating"]
+        
+        if r.get('is_anonymous'):
+            user_text = "Аноним"
+        else:
+            username = r.get('username') or "нет"
+            user_text = f"@{username}"
+        
         text = (
             f"⭐ **ОТЗЫВ**\n\n"
-            f"👤 **От:** {'Аноним' if r.get('is_anonymous') else f'@{r.get(\"username\") or \"нет\"}'}\n"
+            f"👤 **От:** {user_text}\n"
             f"⭐ **Оценка:** {r['rating']}/5 {stars}\n"
         )
         if r.get("comment"):
