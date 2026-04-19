@@ -1,27 +1,18 @@
 import asyncio
-import sys
 from aiogram import Bot, Dispatcher
 from config import TOKEN
-from handlers import user_router, admin_router
-from utils import logger
+from user import user_router
+from admin import admin_router
+
+bot = Bot(token=TOKEN)
+dp = Dispatcher()
+
+dp.include_router(user_router)
+dp.include_router(admin_router)
 
 async def main():
-    bot = Bot(token=TOKEN)
-    dp = Dispatcher()
-    
-    dp.include_router(user_router)
-    dp.include_router(admin_router)
-    
-    logger.info("🤖 Бот запущен!")
-    
-    try:
-        await dp.start_polling(bot)
-    finally:
-        await bot.session.close()
+    print("Бот запущен!")
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Бот остановлен")
-        sys.exit(0)
+    asyncio.run(main())
