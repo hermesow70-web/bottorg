@@ -148,3 +148,20 @@ def add_review(review):
     reviews = load_reviews()
     reviews.append(review)
     save_reviews(reviews)
+# Добавь в конец файла database.py:
+
+from datetime import datetime, timedelta
+
+def delete_old_withdraws(days=1):
+    cutoff = datetime.now() - timedelta(days=days)
+    withdraws = load_withdraws()
+    new_withdraws = []
+    for w in withdraws:
+        if w["status"] == "pending":
+            new_withdraws.append(w)
+        else:
+            created = datetime.fromisoformat(w["created_at"])
+            if created > cutoff:
+                new_withdraws.append(w)
+    save_withdraws(new_withdraws)
+    return len(withdraws) - len(new_withdraws)
