@@ -1,147 +1,181 @@
-import json
-import os
+import sqlite3
 from datetime import datetime
 
-DATA_FOLDER = "data"
-os.makedirs(DATA_FOLDER, exist_ok=True)
-
-USERS_FILE = f"{DATA_FOLDER}/users.json"
-WITHDRAW_FILE = f"{DATA_FOLDER}/withdraws.json"
-REVIEWS_FILE = f"{DATA_FOLDER}/reviews.json"
-
-def load_users():
-    try:
-        with open(USERS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return []
-
-def save_users(users):
-    with open(USERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(users, f, ensure_ascii=False, indent=2)
-
-def load_withdraws():
-    try:
-        with open(WITHDRAW_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return []
-
-def save_withdraws(withdraws):
-    with open(WITHDRAW_FILE, "w", encoding="utf-8") as f:
-        json.dump(withdraws, f, ensure_ascii=False, indent=2)
-
-def load_reviews():
-    try:
-        with open(REVIEWS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return []
-
-def save_reviews(reviews):
-    with open(REVIEWS_FILE, "w", encoding="utf-8") as f:
-        json.dump(reviews, f, ensure_ascii=False, indent=2)
-
-def register_user(user_id, username):
-    users = load_users()
-    for u in users:
-        if u["id"] == user_id:
-            return
-    users.append({
-        "id": user_id,
-        "username": username,
-        "balance": 0,
-        "total_withdrawn": 0,
-        "banned": False,
-        "joined": datetime.now().isoformat()
-    })
-    save_users(users)
+def init_db():
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS users (
+        user_id INTEGER PRIMARY KEY,
+        username TEXT,
+        balance REAL DEFAULT 0,
+        is_banned INTEGER DEFAULT 0,
+        consent INTEGER DEFAULT 0
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS withdrawals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        amount REAL,
+        method TEXT,
+        details TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS reviews (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        rating INTEGER,
+        comment TEXT,
+        anonymous INTEGER,
+        created_at TIMESTAMP
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS appeals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        message TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP
+    )''')
+    conn.commit()
+    conn.close()
 
 def get_user(user_id):
-    users = load_users()
-    for u in users:
-        if u["id"] == user_id:
-            return u
-    return None
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+    user = c.fetchone()
+    conn.close()
+    return user
 
-def get_user_by_username(username):
-    users = load_users()
-    username = username.lower().replace("@", "")
-    for u in users:
-        if u.get("username") and u["username"].lower() == username:
-            return u
-    return None
+def add_user(user_id, username):
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (user_id, username))
+    conn.commit()
+    conn.close()
 
-def update_balance(user_id, new_balance):
-    users = load_users()
-    for i, u in enumerate(users):
-        if u["id"] == user_id:
-            users[i]["balance"] = new_balance
-            save_users(users)
-            return True
-    return False
+def update_balance(user_id, amount):
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (amount, user_id))
+    conn.commit()
+    conn.close()
 
-def add_to_withdrawn(user_id, amount):
-    users = load_users()
-    for i, u in enumerate(users):
-        if u["id"] == user_id:
-            users[i]["total_withdrawn"] = u.get("total_withdrawn", 0) + amount
-            save_users(users)
-            return True
-    return False
-
-def is_banned(user_id):
-    users = load_users()
-    for u in users:
-        if u["id"] == user_id:
-            return u.get("banned", False)
-    return False
-
-def ban_user(user_id):
-    users = load_users()
-    for i, u in enumerate(users):
-        if u["id"] == user_id:
-            users[i]["banned"] = True
-            save_users(users)
-            return True
-    return False
-
-def unban_user(user_id):
-    users = load_users()
-    for i, u in enumerate(users):
-        if u["id"] == user_id:
-            users[i]["banned"] = False
-            save_users(users)
-            return True
-    return False
-
-def get_active_requests_count(user_id):
-    withdraws = load_withdraws()
-    count = 0
-    for w in withdraws:
-        if w["user_id"] == user_id and w["status"] == "pending":
-            count += 1
+def get_pending_withdrawals_count(user_id):
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM withdrawals WHERE user_id = ? AND status = 'pending'", (user_id,))
+    count = c.fetchone()[0]
+    conn.close()
     return count
 
-def get_user_withdraws(user_id):
-    withdraws = load_withdraws()
-    return [w for w in withdraws if w["user_id"] == user_id]
+def add_withdrawal(user_id, amount, method, details):
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("INSERT INTO withdrawals (user_id, amount, method, details, created_at) VALUES (?, ?, ?, ?, ?)",
+              (user_id, amount, method, details, datetime.now()))
+    conn.commit()
+    conn.close()
 
-def add_withdraw(withdraw):
-    withdraws = load_withdraws()
-    withdraws.append(withdraw)
-    save_withdraws(withdraws)
+def get_user_withdrawals(user_id, page=0, per_page=8):
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    offset = page * per_page
+    c.execute("SELECT id, amount, method, status, created_at FROM withdrawals WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+              (user_id, per_page, offset))
+    withdrawals = c.fetchall()
+    c.execute("SELECT COUNT(*) FROM withdrawals WHERE user_id = ?", (user_id,))
+    total = c.fetchone()[0]
+    conn.close()
+    return withdrawals, total
 
-def update_withdraw_status(wid, status):
-    withdraws = load_withdraws()
-    for w in withdraws:
-        if w["id"] == wid:
-            w["status"] = status
-            save_withdraws(withdraws)
-            return w
-    return None
+def save_review(user_id, rating, comment, anonymous):
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("INSERT INTO reviews (user_id, rating, comment, anonymous, created_at) VALUES (?, ?, ?, ?, ?)",
+              (user_id, rating, comment, anonymous, datetime.now()))
+    conn.commit()
+    conn.close()
 
-def add_review(review):
-    reviews = load_reviews()
-    reviews.append(review)
-    save_reviews(reviews)
+def save_appeal(user_id, message):
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("INSERT INTO appeals (user_id, message, created_at) VALUES (?, ?, ?)",
+              (user_id, message, datetime.now()))
+    conn.commit()
+    conn.close()
+
+def get_all_withdrawals(status=None):
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    if status:
+        c.execute("SELECT id, user_id, amount, method, details, status, created_at FROM withdrawals WHERE status = ? ORDER BY created_at DESC", (status,))
+    else:
+        c.execute("SELECT id, user_id, amount, method, details, status, created_at FROM withdrawals ORDER BY created_at DESC")
+    data = c.fetchall()
+    conn.close()
+    return data
+
+def get_all_appeals():
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("SELECT id, user_id, message, status, created_at FROM appeals WHERE status = 'pending' ORDER BY created_at DESC")
+    data = c.fetchall()
+    conn.close()
+    return data
+
+def update_withdrawal_status(withdrawal_id, status):
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("UPDATE withdrawals SET status = ? WHERE id = ?", (status, withdrawal_id))
+    conn.commit()
+    conn.close()
+
+def update_appeal_status(appeal_id, status):
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("UPDATE appeals SET status = ? WHERE id = ?", (status, appeal_id))
+    conn.commit()
+    conn.close()
+
+def get_last_withdrawals(user_id, limit=5):
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("SELECT amount, status, created_at FROM withdrawals WHERE user_id = ? ORDER BY created_at DESC LIMIT ?", (user_id, limit))
+    data = c.fetchall()
+    conn.close()
+    return data
+
+def set_consent(user_id):
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("UPDATE users SET consent = 1 WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+def check_consent(user_id):
+    user = get_user(user_id)
+    return user[4] if user else 0
+
+def ban_user(user_id):
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("UPDATE users SET is_banned = 1 WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+def unban_user(user_id):
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("UPDATE users SET is_banned = 0 WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+def get_user_by_username(username):
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("SELECT user_id, username, balance FROM users WHERE username = ?", (username,))
+    user = c.fetchone()
+    conn.close()
+    return user
+
+init_db()
