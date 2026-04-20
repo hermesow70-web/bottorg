@@ -170,6 +170,10 @@ def unban_user(user_id):
     conn.commit()
     conn.close()
 
+def is_banned(user_id):
+    user = get_user(user_id)
+    return user[3] if user else 0
+
 def get_user_by_username(username):
     conn = sqlite3.connect("database.db")
     c = conn.cursor()
