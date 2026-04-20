@@ -1,263 +1,191 @@
-from aiogram import Router, F
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, Message
-from database import (
-    get_user_by_username, ban_user, unban_user, update_balance,
-    get_user, load_withdraws, update_withdraw_status, add_to_withdrawn
-)
-from keyboards import admin_menu, admin_ban_menu, admin_balance_menu, back_menu, main_menu, withdraw_action_menu
-from utils import notify_admins, notify_user
+import sqlite3
+from aiogram import Router, F, types
+from aiogram.filters import Command
 from config import ADMIN_IDS
+from database import *
 
-admin_router = Router()
+router = Router()
 
-class AdminState(StatesGroup):
-    username = State()
-    amount = State()
-    action = State()
-    reply_user_id = State()
+# Фильтр для админов
+def admin_filter(message: types.Message):
+    return message.from_user.id in ADMIN_IDS
 
-@admin_router.message(lambda msg: msg.text and msg.from_user.id in ADMIN_IDS)
-async def admin_text_handler(message: Message, state: FSMContext):
-    data = await state.get_data()
-    if data.get("reply_user_id"):
-        user_id = data.get("reply_user_id")
-        await notify_user(message.bot, user_id, f"💬 **Ответ администратора:**\n\n{message.text}")
-        await message.answer("✅ Ответ отправлен!")
-        await state.clear()
-        await message.answer("👑 **Админ-панель**", reply_markup=admin_menu())
-
-@admin_router.callback_query(F.data == "admin_panel")
-async def admin_panel_callback(callback: CallbackQuery):
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Нет доступа")
-        return
-    await callback.message.edit_text("👑 **Админ-панель**", reply_markup=admin_menu())
-    await callback.answer()
-
-@admin_router.callback_query(F.data == "admin_back")
-async def admin_back_callback(callback: CallbackQuery):
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Нет доступа")
-        return
-    await callback.message.edit_text("👑 **Админ-панель**", reply_markup=admin_menu())
-    await callback.answer()
-
-@admin_router.callback_query(F.data == "admin_ban")
-async def admin_ban_callback(callback: CallbackQuery):
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Нет доступа")
-        return
-    await callback.message.edit_text("👥 **Управление баном**", reply_markup=admin_ban_menu())
-    await callback.answer()
-
-@admin_router.callback_query(F.data == "admin_balance")
-async def admin_balance_callback(callback: CallbackQuery):
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Нет доступа")
-        return
-    await callback.message.edit_text("💰 **Управление балансом**", reply_markup=admin_balance_menu())
-    await callback.answer()
-
-@admin_router.callback_query(F.data == "admin_requests")
-async def admin_requests_callback(callback: CallbackQuery):
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Нет доступа")
-        return
-    
-    withdraws = load_withdraws()
-    pending = [w for w in withdraws if w["status"] == "pending"]
-    
-    if not pending:
-        await callback.message.edit_text("📭 **Нет активных заявок**", reply_markup=admin_menu())
-        await callback.answer()
-        return
-    
-    for w in pending:
-        text = (
-            f"💰 **Заявка на вывод**\n\n"
-            f"👤 От: @{w['username']}\n"
-            f"💵 Сумма: {w['amount']} USDT\n"
-            f"💳 Способ: {w['method']}\n"
-            f"📝 Реквизиты:\n{w['details']}\n"
-            f"📅 {w['created_at'][:19]}"
-        )
-        await callback.message.answer(text, parse_mode="Markdown", reply_markup=withdraw_action_menu(w["id"]))
-    
-    await callback.message.delete()
-    await callback.answer()
-
-@admin_router.callback_query(F.data == "ban_user")
-async def ban_user_start_callback(callback: CallbackQuery, state: FSMContext):
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Нет доступа")
-        return
-    await state.update_data(action="ban")
-    await state.set_state(AdminState.username)
-    await callback.message.edit_text("🔨 **Введите username пользователя (без @):**", reply_markup=back_menu())
-    await callback.answer()
-
-@admin_router.callback_query(F.data == "unban_user")
-async def unban_user_start_callback(callback: CallbackQuery, state: FSMContext):
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Нет доступа")
-        return
-    await state.update_data(action="unban")
-    await state.set_state(AdminState.username)
-    await callback.message.edit_text("🔓 **Введите username пользователя (без @):**", reply_markup=back_menu())
-    await callback.answer()
-
-@admin_router.callback_query(F.data == "balance_add")
-async def balance_add_callback(callback: CallbackQuery, state: FSMContext):
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Нет доступа")
-        return
-    await state.update_data(action="add")
-    await state.set_state(AdminState.username)
-    await callback.message.edit_text("➕ **Введите username пользователя (без @):**", reply_markup=back_menu())
-    await callback.answer()
-
-@admin_router.callback_query(F.data == "balance_subtract")
-async def balance_subtract_callback(callback: CallbackQuery, state: FSMContext):
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Нет доступа")
-        return
-    await state.update_data(action="subtract")
-    await state.set_state(AdminState.username)
-    await callback.message.edit_text("➖ **Введите username пользователя (без @):**", reply_markup=back_menu())
-    await callback.answer()
-
-@admin_router.callback_query(F.data == "balance_reset")
-async def balance_reset_callback(callback: CallbackQuery, state: FSMContext):
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Нет доступа")
-        return
-    await state.update_data(action="reset")
-    await state.set_state(AdminState.username)
-    await callback.message.edit_text("🔄 **Введите username пользователя (без @):**", reply_markup=back_menu())
-    await callback.answer()
-
-@admin_router.message(AdminState.username)
-async def admin_username_handler(message: Message, state: FSMContext):
-    data = await state.get_data()
-    action = data.get("action")
-    username = message.text.strip().replace("@", "")
-    
-    user = get_user_by_username(username)
-    if not user:
-        await message.answer("❌ Пользователь не найден")
-        return
-    
-    if action == "ban":
-        ban_user(user["id"])
-        await message.answer(f"✅ **Пользователь @{user['username']} забанен**", parse_mode="Markdown")
-        await notify_user(message.bot, user["id"], "❌ **Вы были забанены администратором.**")
-        await state.clear()
-        await message.answer("👑 **Админ-панель**", reply_markup=admin_menu())
-        
-    elif action == "unban":
-        unban_user(user["id"])
-        await message.answer(f"✅ **Пользователь @{user['username']} разбанен**", parse_mode="Markdown")
-        await notify_user(message.bot, user["id"], "✅ **Вы были разбанены.**")
-        await state.clear()
-        await message.answer("👑 **Админ-панель**", reply_markup=admin_menu())
-        
-    elif action == "reset":
-        old_balance = user["balance"]
-        update_balance(user["id"], 0)
-        await message.answer(f"✅ **Баланс обнулён**\n\n👤 @{user['username']}\n📊 {old_balance} → 0 USDT", parse_mode="Markdown")
-        await notify_user(message.bot, user["id"], f"🔄 **Ваш баланс обнулён!**\nБыло: {old_balance} USDT\nСтало: 0 USDT")
-        await state.clear()
-        await message.answer("👑 **Админ-панель**", reply_markup=admin_menu())
-        
-    elif action in ["add", "subtract"]:
-        await state.update_data(user_id=user["id"], username=user["username"])
-        action_text = "начислить" if action == "add" else "списать"
-        await message.answer(f"👤 @{user['username']}\n💰 Баланс: {user['balance']} USDT\n\n💵 **Введите сумму для {action_text} (USDT):**", parse_mode="Markdown")
-        await state.set_state(AdminState.amount)
-
-@admin_router.message(AdminState.amount)
-async def admin_amount_handler(message: Message, state: FSMContext):
+@router.message(Command("add"), admin_filter)
+async def add_balance(message: types.Message):
     try:
-        amount = float(message.text)
-        if amount <= 0:
-            await message.answer("❌ Сумма должна быть больше 0")
-            return
-        
-        data = await state.get_data()
-        user_id = data.get("user_id")
-        username = data.get("username")
-        action = data.get("action")
-        user = get_user(user_id)
-        
-        if action == "add":
-            new_balance = user["balance"] + amount
-            update_balance(user_id, new_balance)
-            await message.answer(f"✅ **Начислено {amount} USDT**\n\n👤 @{username}\n📊 {user['balance'] - amount} → {new_balance} USDT", parse_mode="Markdown")
-            await notify_user(message.bot, user_id, f"➕ **Начислено {amount} USDT!**\n💰 Новый баланс: {new_balance} USDT")
-        else:
-            if amount > user["balance"]:
-                await message.answer(f"❌ Недостаточно средств! Баланс: {user['balance']} USDT")
-                return
-            new_balance = user["balance"] - amount
-            update_balance(user_id, new_balance)
-            await message.answer(f"✅ **Списано {amount} USDT**\n\n👤 @{username}\n📊 {user['balance'] + amount} → {new_balance} USDT", parse_mode="Markdown")
-            await notify_user(message.bot, user_id, f"➖ **Списано {amount} USDT**\n💰 Новый баланс: {new_balance} USDT")
-        
-        await state.clear()
-        await message.answer("👑 **Админ-панель**", reply_markup=admin_menu())
-    except:
-        await message.answer("❌ Введите число")
-
-@admin_router.callback_query(F.data.startswith("approve_"))
-async def approve_withdraw_callback(callback: CallbackQuery):
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Нет доступа")
-        return
-    
-    wid = int(callback.data.split("_")[1])
-    w = update_withdraw_status(wid, "approved")
-    
-    if w:
-        user = get_user(w["user_id"])
+        args = message.text.split()
+        username = args[1].replace('@', '')
+        amount = float(args[2])
+        user = get_user_by_username(username)
         if user:
-            new_balance = user["balance"] - w["amount"]
-            update_balance(w["user_id"], new_balance)
-            add_to_withdrawn(w["user_id"], w["amount"])
-            await notify_user(callback.bot, w["user_id"], f"✅ **Заявка одобрена!**\n💵 {w['amount']} USDT\n💰 Новый баланс: {new_balance} USDT")
-        
-        await callback.message.edit_text(f"✅ Одобрено\n{callback.message.text}")
-    
-    await callback.answer()
+            update_balance(user[0], amount)
+            await message.reply(f"✅ Начислено {amount} USDT @{username}")
+        else:
+            await message.reply("❌ Пользователь не найден")
+    except:
+        await message.reply("❌ /add @username сумма")
 
-@admin_router.callback_query(F.data.startswith("reject_"))
-async def reject_withdraw_callback(callback: CallbackQuery):
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Нет доступа")
-        return
-    
-    wid = int(callback.data.split("_")[1])
-    w = update_withdraw_status(wid, "rejected")
-    
-    if w:
-        await notify_user(callback.bot, w["user_id"], f"❌ **Заявка отклонена!**\n💵 {w['amount']} USDT\n📞 Обратитесь в поддержку")
-        await callback.message.edit_text(f"❌ Отклонено\n{callback.message.text}")
-    
-    await callback.answer()
+@router.message(Command("remove"), admin_filter)
+async def remove_balance(message: types.Message):
+    try:
+        args = message.text.split()
+        username = args[1].replace('@', '')
+        amount = float(args[2])
+        user = get_user_by_username(username)
+        if user:
+            update_balance(user[0], -amount)
+            await message.reply(f"✅ Списано {amount} USDT у @{username}")
+        else:
+            await message.reply("❌ Пользователь не найден")
+    except:
+        await message.reply("❌ /remove @username сумма")
 
-@admin_router.callback_query(F.data.startswith("reply_"))
-async def reply_withdraw_callback(callback: CallbackQuery, state: FSMContext):
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Нет доступа")
+@router.message(Command("reset"), admin_filter)
+async def reset_balance(message: types.Message):
+    try:
+        args = message.text.split()
+        username = args[1].replace('@', '')
+        user = get_user_by_username(username)
+        if user:
+            conn = sqlite3.connect("database.db")
+            c = conn.cursor()
+            c.execute("UPDATE users SET balance = 0 WHERE user_id = ?", (user[0],))
+            conn.commit()
+            conn.close()
+            await message.reply(f"✅ Баланс обнулён у @{username}")
+        else:
+            await message.reply("❌ Пользователь не найден")
+    except:
+        await message.reply("❌ /reset @username")
+
+@router.message(Command("ban"), admin_filter)
+async def ban(message: types.Message):
+    try:
+        args = message.text.split()
+        username = args[1].replace('@', '')
+        user = get_user_by_username(username)
+        if user:
+            ban_user(user[0])
+            await message.reply(f"✅ @{username} забанен")
+        else:
+            await message.reply("❌ Пользователь не найден")
+    except:
+        await message.reply("❌ /ban @username")
+
+@router.message(Command("unban"), admin_filter)
+async def unban(message: types.Message):
+    try:
+        args = message.text.split()
+        username = args[1].replace('@', '')
+        user = get_user_by_username(username)
+        if user:
+            unban_user(user[0])
+            await message.reply(f"✅ @{username} разбанен")
+        else:
+            await message.reply("❌ Пользователь не найден")
+    except:
+        await message.reply("❌ /unban @username")
+
+@router.message(Command("broadcast"), admin_filter)
+async def broadcast(message: types.Message):
+    msg_text = message.text.replace('/broadcast', '').strip()
+    if not msg_text:
+        await message.reply("❌ /broadcast текст")
         return
-    
-    wid = int(callback.data.split("_")[1])
-    withdraws = load_withdraws()
-    for w in withdraws:
-        if w["id"] == wid:
-            await state.update_data(reply_user_id=w["user_id"])
-            await callback.message.answer("💬 **Введите ответ пользователю:**", reply_markup=back_menu())
-            break
-    
-    await callback.answer()
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("SELECT user_id FROM users")
+    users = c.fetchall()
+    conn.close()
+    success = 0
+    for user in users:
+        try:
+            await message.bot.send_message(user[0], f"📢 Рассылка:\n\n{msg_text}")
+            success += 1
+        except:
+            pass
+    await message.reply(f"✅ Отправлено {success} пользователям")
+
+@router.message(Command("find"), admin_filter)
+async def find_user(message: types.Message):
+    try:
+        args = message.text.split()
+        username = args[1].replace('@', '')
+        user = get_user_by_username(username)
+        if user:
+            user_id, balance = user[0], user[2]
+            withdrawals = get_last_withdrawals(user_id, 5)
+            text = f"👤 @{username}\n💰 {balance} USDT\n\n📋 Последние 5 заявок:\n"
+            for w in withdrawals:
+                status_emoji = "⏳" if w[1] == "pending" else ("✅" if w[1] == "approved" else "❌")
+                text += f"{status_emoji} {w[0]} USDT - {w[1]} ({w[2][:16]})\n"
+            await message.reply(text)
+        else:
+            await message.reply("❌ Пользователь не найден")
+    except:
+        await message.reply("❌ /find @username")
+
+@router.message(Command("withdrawals"), admin_filter)
+async def withdrawals_list(message: types.Message):
+    withdrawals = get_all_withdrawals('pending')
+    if not withdrawals:
+        await message.reply("📭 Нет заявок")
+        return
+    for w in withdrawals[:10]:
+        text = f"🆔 #{w[0]}\n👤 {w[1]}\n💰 {w[2]} USDT\n💳 {w[3]}\n📝 {w[4]}\n\n/approve_{w[0]} - Одобрить\n/reject_{w[0]} - Отклонить"
+        await message.reply(text)
+
+@router.message(Command("appeals"), admin_filter)
+async def appeals_list(message: types.Message):
+    appeals = get_all_appeals()
+    if not appeals:
+        await message.reply("📭 Нет обращений")
+        return
+    for a in appeals[:10]:
+        text = f"🆔 #{a[0]}\n👤 {a[1]}\n💬 {a[2]}\n\n/reply_{a[0]} текст"
+        await message.reply(text)
+
+@router.message(admin_filter)
+async def handle_admin_actions(message: types.Message):
+    text = message.text
+    if text.startswith('/approve_'):
+        try:
+            w_id = int(text.split('_')[1])
+            update_withdrawal_status(w_id, 'approved')
+            conn = sqlite3.connect("database.db")
+            c = conn.cursor()
+            c.execute("SELECT user_id FROM withdrawals WHERE id = ?", (w_id,))
+            user_id = c.fetchone()[0]
+            conn.close()
+            await message.bot.send_message(user_id, "✅ Ваша заявка была одобрена, ожидайте")
+            await message.reply(f"✅ Заявка #{w_id} одобрена")
+        except:
+            await message.reply("❌ Ошибка")
+    elif text.startswith('/reject_'):
+        try:
+            w_id = int(text.split('_')[1])
+            update_withdrawal_status(w_id, 'rejected')
+            conn = sqlite3.connect("database.db")
+            c = conn.cursor()
+            c.execute("SELECT user_id FROM withdrawals WHERE id = ?", (w_id,))
+            user_id = c.fetchone()[0]
+            conn.close()
+            await message.bot.send_message(user_id, "❌ Ваша заявка отклонена, обратитесь в поддержку")
+            await message.reply(f"✅ Заявка #{w_id} отклонена")
+        except:
+            await message.reply("❌ Ошибка")
+    elif text.startswith('/reply_'):
+        try:
+            parts = text.split(' ', 1)
+            a_id = int(parts[0].split('_')[1])
+            reply_msg = parts[1]
+            conn = sqlite3.connect("database.db")
+            c = conn.cursor()
+            c.execute("SELECT user_id FROM appeals WHERE id = ?", (a_id,))
+            user_id = c.fetchone()[0]
+            conn.close()
+            update_appeal_status(a_id, 'answered')
+            await message.bot.send_message(user_id, f"🆘 Ответ администратора:\n\n{reply_msg}")
+            await message.reply(f"✅ Ответ отправлен")
+        except:
+            await message.reply("❌ /reply_123 текст")
