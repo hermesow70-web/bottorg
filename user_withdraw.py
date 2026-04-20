@@ -3,10 +3,10 @@ from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
-from database import get_user, update_balance, add_to_withdrawn, add_withdraw, get_user_by_username
+from database import get_user, add_withdraw
 from keyboards import main_menu, profile_menu, withdraw_method_menu, withdraw_card_type_menu, back_menu, withdraw_action_menu
-from utils import notify_admins, notify_user
-from config import ADMIN_IDS, MIN_WITHDRAW
+from utils import notify_admins
+from config import MIN_WITHDRAW
 
 withdraw_router = Router()
 
