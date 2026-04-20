@@ -2,19 +2,12 @@ from aiogram import Router, F, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from config import ADMIN_IDS, MIN_WITHDRAW
+from config import ADMIN_IDS
 from database import *
 from keyboards import get_main_menu, get_profile_keyboard
 from util import WithdrawStates, ReviewStates, SupportStates
 
 router = Router()
-
-# Проверка бана
-async def check_ban(user_id):
-    user = get_user(user_id)
-    if user and user[3] == 1:
-        return True
-    return False
 
 # === СТАРТ ===
 @router.message(Command("start"))
@@ -42,7 +35,7 @@ async def consent_handler(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     set_consent(user_id)
     
-    # Уведомление админам о новом пользователе
+    # Уведомление админам
     for admin_id in ADMIN_IDS:
         try:
             await callback.bot.send_message(
@@ -69,21 +62,18 @@ async def show_welcome(event):
 async def main_menu(callback: types.CallbackQuery):
     await show_welcome(callback)
 
-# === ПРОФИЛЬ (ИСПРАВЛЕННЫЙ) ===
+# === ПРОФИЛЬ ===
 @router.callback_query(F.data == "profile")
 async def profile(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     
-    # Проверка бана
-    if await check_ban(user_id):
+    if is_banned(user_id):
         await callback.message.edit_text("❌ Вы забанены! Обратитесь к администратору.")
         await callback.answer()
         return
     
-    # Получаем пользователя из БД
     user = get_user(user_id)
     if not user:
-        # Если пользователь не найден — добавляем
         add_user(user_id, callback.from_user.username or "нет username")
         user = get_user(user_id)
     
@@ -95,8 +85,7 @@ async def profile(callback: types.CallbackQuery):
     
     try:
         await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=get_profile_keyboard())
-    except Exception as e:
-        # Если не удалось отредактировать — отправляем новое сообщение
+    except:
         await callback.message.answer(text, parse_mode="Markdown", reply_markup=get_profile_keyboard())
     
     await callback.answer()
@@ -106,7 +95,7 @@ async def profile(callback: types.CallbackQuery):
 async def my_withdrawals(callback: types.CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     
-    if await check_ban(user_id):
+    if is_banned(user_id):
         await callback.message.edit_text("❌ Вы забанены! Обратитесь к администратору.")
         await callback.answer()
         return
