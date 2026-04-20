@@ -11,7 +11,7 @@ dp.include_router(user_router)
 dp.include_router(admin_router)
 
 async def main():
-    print("🤖 БОТ ЗАПУЩЕН!")
+    print("🤖 Бот запущен!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
