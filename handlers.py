@@ -5,7 +5,7 @@ from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from config import ADMIN_IDS, REVIEWS_CHANNEL, MIN_WITHDRAW
 
@@ -156,119 +156,6 @@ def add_review(review):
     reviews.append(review)
     save_reviews(reviews)
 
-# ========== КЛАВИАТУРЫ ==========
-def main_keyboard():
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="👤 Профиль")],
-            [KeyboardButton(text="📝 Отзыв")],
-            [KeyboardButton(text="🆘 Поддержка")],
-            [KeyboardButton(text="ℹ️ Инфо")]
-        ],
-        resize_keyboard=True
-    )
-
-def profile_keyboard():
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="💰 Вывести")],
-            [KeyboardButton(text="📋 Мои заявки")],
-            [KeyboardButton(text="◀️ Назад")]
-        ],
-        resize_keyboard=True
-    )
-
-def admin_keyboard():
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="👥 Бан/Разбан")],
-            [KeyboardButton(text="📋 Заявки")],
-            [KeyboardButton(text="💰 Баланс")],
-            [KeyboardButton(text="◀️ Назад")]
-        ],
-        resize_keyboard=True
-    )
-
-def balance_admin_keyboard():
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="➕ Начислить")],
-            [KeyboardButton(text="➖ Списать")],
-            [KeyboardButton(text="🔄 Обнулить")],
-            [KeyboardButton(text="◀️ Назад")]
-        ],
-        resize_keyboard=True
-    )
-
-def ban_keyboard():
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🔨 Забанить")],
-            [KeyboardButton(text="🔓 Разбанить")],
-            [KeyboardButton(text="◀️ Назад")]
-        ],
-        resize_keyboard=True
-    )
-
-def back_keyboard():
-    return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="◀️ Назад")]],
-        resize_keyboard=True
-    )
-
-def withdraw_method_keyboard():
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="💳 Карта", callback_data="method_card")],
-            [InlineKeyboardButton(text="🤖 Crypto Bot", callback_data="method_crypto")]
-        ]
-    )
-
-def withdraw_card_type_keyboard():
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="📱 СБП", callback_data="card_sbp")],
-            [InlineKeyboardButton(text="💳 Номер карты", callback_data="card_number")]
-        ]
-    )
-
-def rating_keyboard():
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="⭐ 1", callback_data="rate_1"),
-             InlineKeyboardButton(text="⭐⭐ 2", callback_data="rate_2"),
-             InlineKeyboardButton(text="⭐⭐⭐ 3", callback_data="rate_3")],
-            [InlineKeyboardButton(text="⭐⭐⭐⭐ 4", callback_data="rate_4"),
-             InlineKeyboardButton(text="⭐⭐⭐⭐⭐ 5", callback_data="rate_5")]
-        ]
-    )
-
-def review_skip_keyboard():
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="📝 Написать", callback_data="review_write")],
-            [InlineKeyboardButton(text="⏩ Пропустить", callback_data="review_skip")]
-        ]
-    )
-
-def review_anonymous_keyboard():
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="📢 Отправить с именем", callback_data="review_named")],
-            [InlineKeyboardButton(text="👤 Отправить анонимно", callback_data="review_anonymous")],
-            [InlineKeyboardButton(text="❌ Отмена", callback_data="review_cancel")]
-        ]
-    )
-
-def withdraw_action_keyboard(wid):
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="✅ Одобрить", callback_data=f"approve_{wid}")],
-            [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject_{wid}")],
-            [InlineKeyboardButton(text="💬 Ответить", callback_data=f"reply_{wid}")]
-        ]
-    )
-
 # ========== УВЕДОМЛЕНИЯ ==========
 async def notify_admins(bot, text, reply_markup=None):
     for admin_id in ADMIN_IDS:
@@ -301,13 +188,15 @@ class AdminBalanceState(StatesGroup):
     amount = State()
     action = State()
 
-class AdminBanState(StatesGroup):
-    username = State()
+# ========== ГЛАВНОЕ МЕНЮ (ВСЕ КНОПКИ INLINE) ==========
+def main_menu():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👤 Профиль", callback_data="profile")],
+        [InlineKeyboardButton(text="📝 Отзыв", callback_data="review")],
+        [InlineKeyboardButton(text="🆘 Поддержка", callback_data="support")],
+        [InlineKeyboardButton(text="ℹ️ Инфо", callback_data="info")]
+    ])
 
-class AdminReplyState(StatesGroup):
-    user_id = State()
-
-# ========== ПОЛЬЗОВАТЕЛЬСКИЕ КОМАНДЫ ==========
 @router.message(Command("start"))
 async def start_cmd(message: types.Message):
     register_user(message.from_user.id, message.from_user.username)
@@ -317,112 +206,147 @@ async def start_cmd(message: types.Message):
     await message.answer(
         "🔥 **Добро пожаловать!**\n\nВыберите действие:",
         parse_mode="Markdown",
-        reply_markup=main_keyboard()
+        reply_markup=main_menu()
     )
 
-@router.message(Command("admin"))
-async def admin_cmd(message: types.Message):
-    if message.from_user.id not in ADMIN_IDS:
-        await message.answer("❌ Нет доступа")
-        return
-    await message.answer("👑 **Админ-панель**", reply_markup=admin_keyboard(), parse_mode="Markdown")
-
-@router.message(F.text == "◀️ Назад")
-async def back_cmd(message: types.Message, state: FSMContext):
-    await state.clear()
-    await message.answer("◀️ Главное меню", reply_markup=main_keyboard())
-
 # ========== ПРОФИЛЬ ==========
-@router.message(F.text == "👤 Профиль")
-async def profile_cmd(message: types.Message):
-    if is_banned(message.from_user.id):
-        await message.answer("❌ Вы забанены")
-        return
-    user = get_user(message.from_user.id)
-    if not user:
-        await message.answer("❌ Ошибка, попробуйте /start")
+@router.callback_query(lambda c: c.data == "profile")
+async def profile_callback(callback: types.CallbackQuery):
+    if is_banned(callback.from_user.id):
+        await callback.answer("Вы забанены", show_alert=True)
         return
     
-    active_count = get_active_requests_count(message.from_user.id)
+    user = get_user(callback.from_user.id)
+    if not user:
+        await callback.message.edit_text("❌ Ошибка", reply_markup=main_menu())
+        return
+    
+    active_count = get_active_requests_count(callback.from_user.id)
     text = (
         f"👤 **Ваш профиль**\n\n"
         f"💰 **Баланс:** {user['balance']} USDT\n"
         f"📋 **Активных заявок:** {active_count}\n"
         f"📤 **Выведено всего:** {user['total_withdrawn']} USDT"
     )
-    await message.answer(text, parse_mode="Markdown", reply_markup=profile_keyboard())
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💰 Вывести", callback_data="withdraw_start")],
+        [InlineKeyboardButton(text="📋 Мои заявки", callback_data="my_requests")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
+    ])
+    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=kb)
+    await callback.answer()
 
-# ========== ВЫВОД ==========
-@router.message(F.text == "💰 Вывести")
-async def withdraw_start_cmd(message: types.Message, state: FSMContext):
-    if is_banned(message.from_user.id):
-        return
-    user = get_user(message.from_user.id)
-    if user["balance"] < MIN_WITHDRAW:
-        await message.answer(f"❌ Минимальная сумма вывода — **{MIN_WITHDRAW} USDT**", parse_mode="Markdown")
+# ========== МОИ ЗАЯВКИ ==========
+@router.callback_query(lambda c: c.data == "my_requests")
+async def my_requests_callback(callback: types.CallbackQuery):
+    withdraws = get_user_withdraws(callback.from_user.id)
+    if not withdraws:
+        await callback.answer("У вас нет заявок", show_alert=True)
         return
     
-    await message.answer(
+    withdraws.reverse()
+    text = "📋 **Ваши заявки на вывод:**\n\n"
+    status_map = {"pending": "⏳ В ожидании", "approved": "✅ Одобрено", "rejected": "❌ Отклонено"}
+    
+    for w in withdraws[:10]:
+        text += f"• {w['amount']} USDT - {status_map.get(w['status'], '⏳ В ожидании')} - {w['created_at'][:10]}\n"
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="profile")]
+    ])
+    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=kb)
+    await callback.answer()
+
+# ========== ВЫВОД ==========
+@router.callback_query(lambda c: c.data == "withdraw_start")
+async def withdraw_start_callback(callback: types.CallbackQuery, state: FSMContext):
+    user = get_user(callback.from_user.id)
+    if user["balance"] < MIN_WITHDRAW:
+        await callback.answer(f"Минимальная сумма {MIN_WITHDRAW} USDT", show_alert=True)
+        return
+    
+    await state.set_state(WithdrawState.amount)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Отмена", callback_data="profile")]
+    ])
+    await callback.message.edit_text(
         f"💸 **Введите сумму вывода (от {MIN_WITHDRAW} USDT):**",
         parse_mode="Markdown",
-        reply_markup=back_keyboard()
+        reply_markup=kb
     )
-    await state.set_state(WithdrawState.amount)
+    await callback.answer()
 
 @router.message(WithdrawState.amount)
 async def withdraw_amount_cmd(message: types.Message, state: FSMContext):
-    if message.text == "◀️ Назад":
-        await state.clear()
-        await profile_cmd(message)
-        return
-    
     try:
         amount = float(message.text)
         if amount < MIN_WITHDRAW:
-            await message.answer(f"❌ Сумма должна быть **не менее {MIN_WITHDRAW} USDT**\nВведите другую сумму:", parse_mode="Markdown")
+            await message.answer(f"❌ Сумма должна быть не менее {MIN_WITHDRAW} USDT\nВведите другую сумму:")
             return
         
         user = get_user(message.from_user.id)
         if amount > user["balance"]:
-            await message.answer(f"❌ У вас {user['balance']} USDT\nВведите сумму не больше баланса:", parse_mode="Markdown")
+            await message.answer(f"❌ У вас {user['balance']} USDT\nВведите сумму не больше баланса:")
             return
         
         await state.update_data(amount=amount)
-        await message.answer("💳 **Выберите способ вывода:**", reply_markup=withdraw_method_keyboard())
+        
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="💳 Карта", callback_data="method_card")],
+            [InlineKeyboardButton(text="🤖 Crypto Bot", callback_data="method_crypto")],
+            [InlineKeyboardButton(text="◀️ Отмена", callback_data="profile")]
+        ])
+        await message.answer("💳 **Выберите способ вывода:**", reply_markup=kb, parse_mode="Markdown")
     except:
         await message.answer("❌ Введите число")
 
 @router.callback_query(lambda c: c.data == "method_card")
-async def withdraw_method_card_callback(callback: types.CallbackQuery, state: FSMContext):
+async def withdraw_card_callback(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(method="card")
-    await callback.message.edit_text("💳 **Выберите тип перевода:**", reply_markup=withdraw_card_type_keyboard())
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📱 СБП", callback_data="card_sbp")],
+        [InlineKeyboardButton(text="💳 Номер карты", callback_data="card_number")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="withdraw_start")]
+    ])
+    await callback.message.edit_text("💳 **Выберите тип перевода:**", reply_markup=kb, parse_mode="Markdown")
     await callback.answer()
 
 @router.callback_query(lambda c: c.data == "method_crypto")
-async def withdraw_method_crypto_callback(callback: types.CallbackQuery, state: FSMContext):
+async def withdraw_crypto_callback(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(method="crypto")
+    await state.set_state(WithdrawState.crypto_link)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Отмена", callback_data="profile")]
+    ])
     await callback.message.edit_text(
         "🤖 **Отправьте ссылку на счёт из @CryptoBot**\n\n"
         "1. Перейдите в @CryptoBot\n"
         "2. Создайте счёт на оплату\n"
         "3. Пришлите ссылку сюда:",
-        parse_mode="Markdown"
+        parse_mode="Markdown",
+        reply_markup=kb
     )
-    await state.set_state(WithdrawState.crypto_link)
     await callback.answer()
 
 @router.callback_query(lambda c: c.data == "card_sbp")
-async def withdraw_card_sbp_callback(callback: types.CallbackQuery, state: FSMContext):
+async def card_sbp_callback(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(card_type="sbp")
-    await callback.message.edit_text("📱 **Введите номер телефона (привязанный к банку):**")
     await state.set_state(WithdrawState.phone)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Отмена", callback_data="profile")]
+    ])
+    await callback.message.edit_text("📱 **Введите номер телефона (привязанный к банку):**", reply_markup=kb)
     await callback.answer()
 
 @router.callback_query(lambda c: c.data == "card_number")
-async def withdraw_card_number_callback(callback: types.CallbackQuery, state: FSMContext):
+async def card_number_callback(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(card_type="card_number")
-    await callback.message.edit_text("💳 **Введите номер карты (16 цифр):**")
     await state.set_state(WithdrawState.phone)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Отмена", callback_data="profile")]
+    ])
+    await callback.message.edit_text("💳 **Введите номер карты (16 цифр):**", reply_markup=kb)
     await callback.answer()
 
 @router.message(WithdrawState.phone)
@@ -478,6 +402,13 @@ async def finish_withdraw(message: types.Message, state: FSMContext):
     }
     add_withdraw(withdraw)
     
+    # Кнопки для админов
+    admin_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Одобрить", callback_data=f"approve_{withdraw['id']}")],
+        [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject_{withdraw['id']}")],
+        [InlineKeyboardButton(text="💬 Ответить", callback_data=f"reply_{withdraw['id']}")]
+    ])
+    
     await notify_admins(
         message.bot,
         f"💰 **Новая заявка на вывод!**\n\n"
@@ -485,75 +416,74 @@ async def finish_withdraw(message: types.Message, state: FSMContext):
         f"💵 Сумма: {amount} USDT\n"
         f"💳 Способ: {method}\n"
         f"📝 Реквизиты:\n{details}",
-        withdraw_action_keyboard(withdraw["id"])
+        admin_kb
     )
     
     await message.answer(
-        f"✅ **Заявка на вывод {amount} USDT отправлена!**\n\n"
-        f"⏳ Статус: **В ожидании**\n"
-        f"Администратор рассмотрит её в ближайшее время.",
+        f"✅ **Заявка на вывод {amount} USDT отправлена!**\n\n⏳ Статус: **В ожидании**",
         parse_mode="Markdown",
-        reply_markup=main_keyboard()
+        reply_markup=main_menu()
     )
-    
     await state.clear()
 
-# ========== МОИ ЗАЯВКИ ==========
-@router.message(F.text == "📋 Мои заявки")
-async def my_withdraws_cmd(message: types.Message):
-    if is_banned(message.from_user.id):
-        return
-    withdraws = get_user_withdraws(message.from_user.id)
-    if not withdraws:
-        await message.answer("📭 **У вас нет заявок на вывод**", parse_mode="Markdown", reply_markup=profile_keyboard())
-        return
-    
-    withdraws.reverse()
-    text = "📋 **Ваши заявки на вывод:**\n\n"
-    status_map = {"pending": "⏳ В ожидании", "approved": "✅ Одобрено", "rejected": "❌ Отклонено"}
-    
-    for w in withdraws[:10]:
-        text += f"• {w['amount']} USDT - {status_map.get(w['status'], '⏳ В ожидании')} - {w['created_at'][:10]}\n"
-    
-    await message.answer(text, parse_mode="Markdown", reply_markup=profile_keyboard())
-
 # ========== ОТЗЫВ ==========
-@router.message(F.text == "📝 Отзыв")
-async def review_start_cmd(message: types.Message, state: FSMContext):
-    if is_banned(message.from_user.id):
-        return
-    await message.answer("⭐ **Оцените наш сервис:**", reply_markup=rating_keyboard())
-    await state.set_state(ReviewState.rating)
+@router.callback_query(lambda c: c.data == "review")
+async def review_start_callback(callback: types.CallbackQuery, state: FSMContext):
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⭐ 1", callback_data="rate_1"),
+         InlineKeyboardButton(text="⭐⭐ 2", callback_data="rate_2"),
+         InlineKeyboardButton(text="⭐⭐⭐ 3", callback_data="rate_3")],
+        [InlineKeyboardButton(text="⭐⭐⭐⭐ 4", callback_data="rate_4"),
+         InlineKeyboardButton(text="⭐⭐⭐⭐⭐ 5", callback_data="rate_5")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
+    ])
+    await callback.message.edit_text("⭐ **Оцените наш сервис:**", reply_markup=kb, parse_mode="Markdown")
+    await callback.answer()
 
 @router.callback_query(lambda c: c.data.startswith("rate_"))
 async def review_rating_callback(callback: types.CallbackQuery, state: FSMContext):
     rating = int(callback.data.split("_")[1])
     await state.update_data(rating=rating)
-    await callback.message.edit_text("💬 **Напишите комментарий или пропустите:**", reply_markup=review_skip_keyboard())
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📝 Написать", callback_data="review_write")],
+        [InlineKeyboardButton(text="⏩ Пропустить", callback_data="review_skip")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="review")]
+    ])
+    await callback.message.edit_text("💬 **Напишите комментарий или пропустите:**", reply_markup=kb, parse_mode="Markdown")
     await callback.answer()
 
 @router.callback_query(lambda c: c.data == "review_write")
 async def review_write_callback(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.edit_text("✏️ **Напишите ваш комментарий:**")
     await state.set_state(ReviewState.comment)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Отмена", callback_data="review")]
+    ])
+    await callback.message.edit_text("✏️ **Напишите ваш комментарий:**", reply_markup=kb, parse_mode="Markdown")
     await callback.answer()
 
 @router.callback_query(lambda c: c.data == "review_skip")
 async def review_skip_callback(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(comment=None)
-    await callback.message.edit_text("📢 **Как отправить отзыв?**", reply_markup=review_anonymous_keyboard())
-    await callback.answer()
+    await show_anonymous_options(callback.message, state)
+
+async def show_anonymous_options(message: types.Message, state: FSMContext):
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📢 Отправить с именем", callback_data="review_named")],
+        [InlineKeyboardButton(text="👤 Отправить анонимно", callback_data="review_anonymous")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="review")]
+    ])
+    await message.edit_text("📢 **Как отправить отзыв?**", reply_markup=kb, parse_mode="Markdown")
 
 @router.message(ReviewState.comment)
 async def review_comment_cmd(message: types.Message, state: FSMContext):
     await state.update_data(comment=message.text)
-    await message.answer("📢 **Как отправить отзыв?**", reply_markup=review_anonymous_keyboard())
+    await show_anonymous_options(message, state)
 
 @router.callback_query(lambda c: c.data.startswith("review_"))
 async def review_send_callback(callback: types.CallbackQuery, state: FSMContext):
     if callback.data == "review_cancel":
-        await state.clear()
-        await callback.message.edit_text("❌ Отзыв отменён", reply_markup=main_keyboard())
+        await callback.message.edit_text("❌ Отзыв отменён", reply_markup=main_menu())
         await callback.answer()
         return
     
@@ -588,22 +518,25 @@ async def review_send_callback(callback: types.CallbackQuery, state: FSMContext)
     
     await notify_admins(callback.bot, f"⭐ **Новый отзыв!**\n\n👤 {name}\n⭐ {rating}/5\n💬 {comment_text}")
     await state.clear()
-    await callback.message.edit_text("✅ **Спасибо за ваш отзыв!**", reply_markup=main_keyboard())
+    await callback.message.edit_text("✅ **Спасибо за ваш отзыв!**", reply_markup=main_menu())
     await callback.answer()
 
 # ========== ПОДДЕРЖКА ==========
-@router.message(F.text == "🆘 Поддержка")
-async def support_cmd(message: types.Message):
-    if is_banned(message.from_user.id):
-        return
-    await message.answer(
-        "📞 **Связь с администратором**\n\nНапишите ваш вопрос, и мы ответим вам в ближайшее время.",
+@router.callback_query(lambda c: c.data == "support")
+async def support_callback(callback: types.CallbackQuery):
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
+    ])
+    await callback.message.edit_text(
+        "📞 **Связь с администратором**\n\nНапишите ваш вопрос, и мы ответим вам.",
         parse_mode="Markdown",
-        reply_markup=back_keyboard()
+        reply_markup=kb
     )
+    await callback.answer()
 
-@router.message(F.text == "ℹ️ Инфо")
-async def info_cmd(message: types.Message):
+# ========== ИНФО ==========
+@router.callback_query(lambda c: c.data == "info")
+async def info_callback(callback: types.CallbackQuery):
     text = (
         "ℹ️ **Информация**\n\n"
         "🕒 **График работы:**\nПн-Пт с 11:00 до 19:30\n\n"
@@ -613,7 +546,22 @@ async def info_cmd(message: types.Message):
         "📢 **Подробная информация:**\n👉 https://t.me/+ZAJelSN78aliNzIx\n\n"
         "📞 **По всем вопросам:** обратитесь в поддержку"
     )
-    await message.answer(text, parse_mode="Markdown", reply_markup=main_keyboard())
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
+    ])
+    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=kb)
+    await callback.answer()
+
+# ========== НАЗАД В ГЛАВНОЕ МЕНЮ ==========
+@router.callback_query(lambda c: c.data == "back_to_main")
+async def back_to_main_callback(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.edit_text(
+        "🔥 **Добро пожаловать!**\n\nВыберите действие:",
+        parse_mode="Markdown",
+        reply_markup=main_menu()
+    )
+    await callback.answer()
 
 # ========== ОБРАБОТКА ТЕКСТА В ПОДДЕРЖКУ ==========
 @router.message(F.text)
@@ -622,89 +570,70 @@ async def support_message_cmd(message: types.Message):
         return
     if message.from_user.id in ADMIN_IDS:
         return
-    if message.text in ["👤 Профиль", "📝 Отзыв", "🆘 Поддержка", "ℹ️ Инфо", "◀️ Назад", "💰 Вывести", "📋 Мои заявки"]:
-        return
     
     await notify_admins(
         message.bot,
         f"🆘 **Вопрос от пользователя!**\n\n👤 От: @{message.from_user.username}\n📝 Сообщение: {message.text}"
     )
     await message.answer(
-        "✅ **Сообщение отправлено!**\nАдминистратор ответит вам в ближайшее время.",
+        "✅ **Сообщение отправлено!**\nАдминистратор ответит вам.",
         parse_mode="Markdown",
-        reply_markup=main_keyboard()
+        reply_markup=main_menu()
     )
 
 # ========== АДМИН-ПАНЕЛЬ ==========
-@router.message(F.text == "👥 Бан/Разбан")
-async def ban_menu_cmd(message: types.Message):
+@router.message(Command("admin"))
+async def admin_cmd(message: types.Message):
     if message.from_user.id not in ADMIN_IDS:
-        return
-    await message.answer("👥 **Управление баном**", reply_markup=ban_keyboard(), parse_mode="Markdown")
-
-@router.message(F.text == "🔨 Забанить")
-async def ban_user_start_cmd(message: types.Message, state: FSMContext):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    await message.answer("Введите **username** пользователя (без @):", reply_markup=back_keyboard(), parse_mode="Markdown")
-    await state.set_state(AdminBanState.username)
-
-@router.message(AdminBanState.username)
-async def ban_user_execute_cmd(message: types.Message, state: FSMContext):
-    if message.text == "◀️ Назад":
-        await state.clear()
-        await ban_menu_cmd(message)
+        await message.answer("❌ Нет доступа")
         return
     
-    user = get_user_by_username(message.text)
-    if not user:
-        await message.answer("❌ Пользователь не найден")
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👥 Бан/Разбан", callback_data="admin_ban")],
+        [InlineKeyboardButton(text="📋 Заявки", callback_data="admin_requests")],
+        [InlineKeyboardButton(text="💰 Баланс", callback_data="admin_balance")],
+        [InlineKeyboardButton(text="◀️ Выход", callback_data="back_to_main")]
+    ])
+    await message.answer("👑 **Админ-панель**", reply_markup=kb, parse_mode="Markdown")
+
+@router.callback_query(lambda c: c.data == "admin_ban")
+async def admin_ban_menu(callback: types.CallbackQuery):
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("Нет доступа")
         return
     
-    ban_user(user["id"])
-    await message.answer(f"✅ **Пользователь @{user['username']} забанен**", parse_mode="Markdown", reply_markup=admin_keyboard())
-    await notify_admins(message.bot, f"🔨 Админ забанил @{user['username']}")
-    await notify_user(message.bot, user["id"], "❌ **Вы были забанены администратором.**")
-    await state.clear()
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔨 Забанить", callback_data="ban_user_start")],
+        [InlineKeyboardButton(text="🔓 Разбанить", callback_data="unban_user_start")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_back")]
+    ])
+    await callback.message.edit_text("👥 **Управление баном**", reply_markup=kb, parse_mode="Markdown")
+    await callback.answer()
 
-@router.message(F.text == "🔓 Разбанить")
-async def unban_user_start_cmd(message: types.Message, state: FSMContext):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    await message.answer("Введите **username** пользователя (без @):", reply_markup=back_keyboard(), parse_mode="Markdown")
-    await state.set_state(AdminBanState.username)
-
-@router.message(AdminBanState.username)
-async def unban_user_execute_cmd(message: types.Message, state: FSMContext):
-    if message.text == "◀️ Назад":
-        await state.clear()
-        await ban_menu_cmd(message)
-        return
-    
-    user = get_user_by_username(message.text)
-    if not user:
-        await message.answer("❌ Пользователь не найден")
-        return
-    
-    unban_user(user["id"])
-    await message.answer(f"✅ **Пользователь @{user['username']} разбанен**", parse_mode="Markdown", reply_markup=admin_keyboard())
-    await notify_admins(message.bot, f"🔓 Админ разбанил @{user['username']}")
-    await notify_user(message.bot, user["id"], "✅ **Вы были разбанены.**")
-    await state.clear()
-
-@router.message(F.text == "📋 Заявки")
-async def list_withdraws_cmd(message: types.Message):
-    if message.from_user.id not in ADMIN_IDS:
+@router.callback_query(lambda c: c.data == "admin_requests")
+async def admin_requests_menu(callback: types.CallbackQuery):
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("Нет доступа")
         return
     
     withdraws = load_withdraws()
     pending = [w for w in withdraws if w["status"] == "pending"]
     
     if not pending:
-        await message.answer("📭 **Нет активных заявок**", reply_markup=admin_keyboard(), parse_mode="Markdown")
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_back")]
+        ])
+        await callback.message.edit_text("📭 **Нет активных заявок**", reply_markup=kb, parse_mode="Markdown")
+        await callback.answer()
         return
     
     for w in pending:
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Одобрить", callback_data=f"approve_{w['id']}")],
+            [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject_{w['id']}")],
+            [InlineKeyboardButton(text="💬 Ответить", callback_data=f"reply_{w['id']}")],
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_back")]
+        ])
         text = (
             f"💰 **Заявка на вывод**\n\n"
             f"👤 От: @{w['username']}\n"
@@ -713,8 +642,193 @@ async def list_withdraws_cmd(message: types.Message):
             f"📝 Реквизиты:\n{w['details']}\n"
             f"📅 {w['created_at'][:19]}"
         )
-        await message.answer(text, parse_mode="Markdown", reply_markup=withdraw_action_keyboard(w["id"]))
+        await callback.message.answer(text, parse_mode="Markdown", reply_markup=kb)
+    
+    await callback.message.delete()
+    await callback.answer()
 
+@router.callback_query(lambda c: c.data == "admin_balance")
+async def admin_balance_menu(callback: types.CallbackQuery):
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("Нет доступа")
+        return
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="➕ Начислить", callback_data="balance_add")],
+        [InlineKeyboardButton(text="➖ Списать", callback_data="balance_subtract")],
+        [InlineKeyboardButton(text="🔄 Обнулить", callback_data="balance_reset")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_back")]
+    ])
+    await callback.message.edit_text("💰 **Управление балансом**", reply_markup=kb, parse_mode="Markdown")
+    await callback.answer()
+
+@router.callback_query(lambda c: c.data == "admin_back")
+async def admin_back_callback(callback: types.CallbackQuery):
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("Нет доступа")
+        return
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👥 Бан/Разбан", callback_data="admin_ban")],
+        [InlineKeyboardButton(text="📋 Заявки", callback_data="admin_requests")],
+        [InlineKeyboardButton(text="💰 Баланс", callback_data="admin_balance")],
+        [InlineKeyboardButton(text="◀️ Выход", callback_data="back_to_main")]
+    ])
+    await callback.message.edit_text("👑 **Админ-панель**", reply_markup=kb, parse_mode="Markdown")
+    await callback.answer()
+
+# ========== БАН/РАЗБАН (ВВОД USERNAME) ==========
+@router.callback_query(lambda c: c.data == "ban_user_start")
+async def ban_user_start_callback(callback: types.CallbackQuery, state: FSMContext):
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("Нет доступа")
+        return
+    
+    await state.update_data(action="ban")
+    await state.set_state(AdminBalanceState.username)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Отмена", callback_data="admin_ban")]
+    ])
+    await callback.message.edit_text("🔨 **Введите username пользователя (без @):**", reply_markup=kb, parse_mode="Markdown")
+    await callback.answer()
+
+@router.callback_query(lambda c: c.data == "unban_user_start")
+async def unban_user_start_callback(callback: types.CallbackQuery, state: FSMContext):
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("Нет доступа")
+        return
+    
+    await state.update_data(action="unban")
+    await state.set_state(AdminBalanceState.username)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Отмена", callback_data="admin_ban")]
+    ])
+    await callback.message.edit_text("🔓 **Введите username пользователя (без @):**", reply_markup=kb, parse_mode="Markdown")
+    await callback.answer()
+
+# ========== БАЛАНС (ВВОД USERNAME) ==========
+@router.callback_query(lambda c: c.data == "balance_add")
+async def balance_add_callback(callback: types.CallbackQuery, state: FSMContext):
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("Нет доступа")
+        return
+    
+    await state.update_data(action="add")
+    await state.set_state(AdminBalanceState.username)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Отмена", callback_data="admin_balance")]
+    ])
+    await callback.message.edit_text("➕ **Введите username пользователя (без @):**", reply_markup=kb, parse_mode="Markdown")
+    await callback.answer()
+
+@router.callback_query(lambda c: c.data == "balance_subtract")
+async def balance_subtract_callback(callback: types.CallbackQuery, state: FSMContext):
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("Нет доступа")
+        return
+    
+    await state.update_data(action="subtract")
+    await state.set_state(AdminBalanceState.username)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Отмена", callback_data="admin_balance")]
+    ])
+    await callback.message.edit_text("➖ **Введите username пользователя (без @):**", reply_markup=kb, parse_mode="Markdown")
+    await callback.answer()
+
+@router.callback_query(lambda c: c.data == "balance_reset")
+async def balance_reset_callback(callback: types.CallbackQuery, state: FSMContext):
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("Нет доступа")
+        return
+    
+    await state.update_data(action="reset")
+    await state.set_state(AdminBalanceState.username)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Отмена", callback_data="admin_balance")]
+    ])
+    await callback.message.edit_text("🔄 **Введите username пользователя (без @):**", reply_markup=kb, parse_mode="Markdown")
+    await callback.answer()
+
+# ========== ОБРАБОТКА USERNAME ==========
+@router.message(AdminBalanceState.username)
+async def admin_username_cmd(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    action = data.get("action")
+    username = message.text.strip().replace("@", "")
+    
+    user = get_user_by_username(username)
+    if not user:
+        await message.answer("❌ Пользователь не найден")
+        return
+    
+    if action == "ban":
+        ban_user(user["id"])
+        await message.answer(f"✅ **Пользователь @{user['username']} забанен**", parse_mode="Markdown")
+        await notify_admins(message.bot, f"🔨 Админ забанил @{user['username']}")
+        await notify_user(message.bot, user["id"], "❌ **Вы были забанены администратором.**")
+        await state.clear()
+        await admin_cmd(message)
+        
+    elif action == "unban":
+        unban_user(user["id"])
+        await message.answer(f"✅ **Пользователь @{user['username']} разбанен**", parse_mode="Markdown")
+        await notify_admins(message.bot, f"🔓 Админ разбанил @{user['username']}")
+        await notify_user(message.bot, user["id"], "✅ **Вы были разбанены.**")
+        await state.clear()
+        await admin_cmd(message)
+        
+    elif action == "reset":
+        old_balance = user["balance"]
+        update_balance(user["id"], 0)
+        await message.answer(f"✅ **Баланс обнулён**\n\n👤 @{user['username']}\n📊 {old_balance} → 0 USDT", parse_mode="Markdown")
+        await notify_admins(message.bot, f"🔄 Админ обнулил баланс @{user['username']} ({old_balance} → 0 USDT)")
+        await notify_user(message.bot, user["id"], f"🔄 **Ваш баланс обнулён!**\nБыло: {old_balance} USDT\nСтало: 0 USDT")
+        await state.clear()
+        await admin_cmd(message)
+        
+    elif action in ["add", "subtract"]:
+        await state.update_data(user_id=user["id"], username=user["username"])
+        action_text = "начислить" if action == "add" else "списать"
+        await message.answer(f"👤 @{user['username']}\n💰 Баланс: {user['balance']} USDT\n\n💵 **Введите сумму для {action_text} (USDT):**", parse_mode="Markdown")
+        await state.set_state(AdminBalanceState.amount)
+
+# ========== ОБРАБОТКА СУММЫ ==========
+@router.message(AdminBalanceState.amount)
+async def admin_amount_cmd(message: types.Message, state: FSMContext):
+    try:
+        amount = float(message.text)
+        if amount <= 0:
+            await message.answer("❌ Сумма должна быть больше 0")
+            return
+        
+        data = await state.get_data()
+        user_id = data.get("user_id")
+        username = data.get("username")
+        action = data.get("action")
+        user = get_user(user_id)
+        
+        if action == "add":
+            new_balance = user["balance"] + amount
+            update_balance(user_id, new_balance)
+            await message.answer(f"✅ **Начислено {amount} USDT**\n\n👤 @{username}\n📊 {user['balance'] - amount} → {new_balance} USDT", parse_mode="Markdown")
+            await notify_admins(message.bot, f"➕ Админ начислил {amount} USDT @{username}")
+            await notify_user(message.bot, user_id, f"➕ **Начислено {amount} USDT!**\n💰 Новый баланс: {new_balance} USDT")
+        else:
+            if amount > user["balance"]:
+                await message.answer(f"❌ Недостаточно средств! Баланс: {user['balance']} USDT")
+                return
+            new_balance = user["balance"] - amount
+            update_balance(user_id, new_balance)
+            await message.answer(f"✅ **Списано {amount} USDT**\n\n👤 @{username}\n📊 {user['balance'] + amount} → {new_balance} USDT", parse_mode="Markdown")
+            await notify_admins(message.bot, f"➖ Админ списал {amount} USDT у @{username}")
+            await notify_user(message.bot, user_id, f"➖ **Списано {amount} USDT**\n💰 Новый баланс: {new_balance} USDT")
+        
+        await state.clear()
+        await admin_cmd(message)
+    except:
+        await message.answer("❌ Введите число")
+
+# ========== ОБРАБОТКА ЗАЯВОК (APPROVE/REJECT/REPLY) ==========
 @router.callback_query(lambda c: c.data.startswith("approve_"))
 async def approve_withdraw_callback(callback: types.CallbackQuery):
     if callback.from_user.id not in ADMIN_IDS:
@@ -763,110 +877,24 @@ async def reply_to_withdraw_callback(callback: types.CallbackQuery, state: FSMCo
     withdraws = load_withdraws()
     for w in withdraws:
         if w["id"] == wid:
-            await state.update_data(user_id=w["user_id"])
-            await callback.message.answer("💬 **Введите ответ пользователю:**")
-            await state.set_state(AdminReplyState.user_id)
+            await state.update_data(reply_user_id=w["user_id"])
+            await state.set_state(AdminBalanceState.username)  # переиспользуем состояние
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Отмена", callback_data="admin_requests")]
+            ])
+            await callback.message.answer("💬 **Введите ответ пользователю:**", reply_markup=kb)
             break
     
     await callback.answer()
 
-@router.message(AdminReplyState.user_id)
+@router.message(AdminBalanceState.username)
 async def send_reply_cmd(message: types.Message, state: FSMContext):
     data = await state.get_data()
-    user_id = data.get("user_id")
+    user_id = data.get("reply_user_id")
     
-    await notify_user(message.bot, user_id, f"💬 **Ответ администратора:**\n\n{message.text}")
-    await message.answer("✅ **Ответ отправлен!**", reply_markup=admin_keyboard())
+    if user_id:
+        await notify_user(message.bot, user_id, f"💬 **Ответ администратора:**\n\n{message.text}")
+        await message.answer("✅ **Ответ отправлен!**")
+    
     await state.clear()
-
-@router.message(F.text == "💰 Баланс")
-async def balance_admin_menu_cmd(message: types.Message):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    await message.answer("💰 **Управление балансом**", reply_markup=balance_admin_keyboard(), parse_mode="Markdown")
-
-@router.message(F.text == "➕ Начислить")
-async def add_balance_start_cmd(message: types.Message, state: FSMContext):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    await state.update_data(action="add")
-    await message.answer("Введите **username** пользователя (без @):", reply_markup=back_keyboard(), parse_mode="Markdown")
-    await state.set_state(AdminBalanceState.username)
-
-@router.message(F.text == "➖ Списать")
-async def subtract_balance_start_cmd(message: types.Message, state: FSMContext):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    await state.update_data(action="subtract")
-    await message.answer("Введите **username** пользователя (без @):", reply_markup=back_keyboard(), parse_mode="Markdown")
-    await state.set_state(AdminBalanceState.username)
-
-@router.message(F.text == "🔄 Обнулить")
-async def reset_balance_start_cmd(message: types.Message, state: FSMContext):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    await state.update_data(action="reset")
-    await message.answer("Введите **username** пользователя (без @):", reply_markup=back_keyboard(), parse_mode="Markdown")
-    await state.set_state(AdminBalanceState.username)
-
-@router.message(AdminBalanceState.username)
-async def balance_get_user_cmd(message: types.Message, state: FSMContext):
-    if message.text == "◀️ Назад":
-        await state.clear()
-        await balance_admin_menu_cmd(message)
-        return
-    
-    user = get_user_by_username(message.text)
-    if not user:
-        await message.answer("❌ Пользователь не найден")
-        return
-    
-    await state.update_data(username=message.text, user_id=user["id"])
-    data = await state.get_data()
-    action = data.get("action")
-    
-    if action == "reset":
-        old_balance = user["balance"]
-        update_balance(user["id"], 0)
-        await message.answer(f"✅ **Баланс обнулён**\n\n👤 @{user['username']}\n📊 {old_balance} → 0 USDT", parse_mode="Markdown", reply_markup=admin_keyboard())
-        await notify_admins(message.bot, f"🔄 Админ обнулил баланс @{user['username']} ({old_balance} → 0 USDT)")
-        await notify_user(message.bot, user["id"], f"🔄 **Ваш баланс обнулён!**\nБыло: {old_balance} USDT\nСтало: 0 USDT")
-        await state.clear()
-    else:
-        action_text = "начислить" if action == "add" else "списать"
-        await message.answer(f"👤 @{user['username']}\n💰 Баланс: {user['balance']} USDT\n\n💵 Введите сумму для **{action_text}** (USDT):", parse_mode="Markdown")
-        await state.set_state(AdminBalanceState.amount)
-
-@router.message(AdminBalanceState.amount)
-async def balance_amount_cmd(message: types.Message, state: FSMContext):
-    try:
-        amount = float(message.text)
-        if amount <= 0:
-            await message.answer("❌ Сумма должна быть больше 0")
-            return
-        
-        data = await state.get_data()
-        user_id = data.get("user_id")
-        username = data.get("username")
-        action = data.get("action")
-        user = get_user(user_id)
-        
-        if action == "add":
-            new_balance = user["balance"] + amount
-            update_balance(user_id, new_balance)
-            await message.answer(f"✅ **Начислено {amount} USDT**\n\n👤 @{username}\n📊 {user['balance'] - amount} → {new_balance} USDT", parse_mode="Markdown", reply_markup=admin_keyboard())
-            await notify_admins(message.bot, f"➕ Админ начислил {amount} USDT @{username}")
-            await notify_user(message.bot, user_id, f"➕ **Начислено {amount} USDT!**\n💰 Новый баланс: {new_balance} USDT")
-        else:
-            if amount > user["balance"]:
-                await message.answer(f"❌ Недостаточно средств! Баланс: {user['balance']} USDT")
-                return
-            new_balance = user["balance"] - amount
-            update_balance(user_id, new_balance)
-            await message.answer(f"✅ **Списано {amount} USDT**\n\n👤 @{username}\n📊 {user['balance'] + amount} → {new_balance} USDT", parse_mode="Markdown", reply_markup=admin_keyboard())
-            await notify_admins(message.bot, f"➖ Админ списал {amount} USDT у @{username}")
-            await notify_user(message.bot, user_id, f"➖ **Списано {amount} USDT**\n💰 Новый баланс: {new_balance} USDT")
-        
-        await state.clear()
-    except:
-        await message.answer("❌ Введите число")
+    await admin_cmd(message)
