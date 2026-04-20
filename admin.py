@@ -4,10 +4,10 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 from database import (
     get_user_by_username, ban_user, unban_user, update_balance,
-    get_user, load_withdraws, update_withdraw_status, add_to_withdrawn,
-    notify_admins, notify_user
+    get_user, load_withdraws, update_withdraw_status, add_to_withdrawn
 )
 from keyboards import admin_menu, admin_ban_menu, admin_balance_menu, back_menu, main_menu, withdraw_action_menu
+from utils import notify_admins, notify_user
 from config import ADMIN_IDS
 
 admin_router = Router()
