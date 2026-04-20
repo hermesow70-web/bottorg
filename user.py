@@ -10,8 +10,9 @@ from database import (
     add_review, load_withdraws, is_banned
 )
 from keyboards import (
-    main_keyboard, profile_keyboard, back_keyboard, cancel_keyboard,
-    rating_keyboard, review_skip_keyboard, withdraw_action_keyboard
+    main_keyboard, profile_keyboard, back_keyboard, withdraw_amount_keyboard,
+    withdraw_method_keyboard, withdraw_card_type_keyboard,
+    rating_keyboard, review_skip_keyboard, support_keyboard
 )
 from config import ADMIN_IDS, REVIEWS_CHANNEL
 
@@ -30,81 +31,70 @@ class ReviewState(StatesGroup):
     rating = State()
     comment = State()
 
-# ========== УВЕДОМЛЕНИЯ ==========
-async def notify_admins(bot, text):
+async def notify_admins(bot, text, reply_markup=None):
     for admin_id in ADMIN_IDS:
         try:
-            await bot.send_message(admin_id, text, parse_mode="Markdown")
+            await bot.send_message(admin_id, text, parse_mode="Markdown", reply_markup=reply_markup)
         except:
             pass
 
-# ========== СТАРТ ==========
 @user_router.message(Command("start"))
 async def start(message: types.Message):
     register_user(message.from_user.id, message.from_user.username)
     if is_banned(message.from_user.id):
-        await message.answer("❌ Вы забанены")
+        await message.answer("❌ ВЫ ЗАБАНЕНЫ")
         return
     await message.answer(
-        "🔥 **Добро пожаловать!**\n\n"
-        "Выберите действие:",
-        reply_markup=main_keyboard(),
-        parse_mode="Markdown"
+        "🔥 **ДОБРО ПОЖАЛОВАТЬ!**\n\n"
+        "ВЫБЕРИТЕ ДЕЙСТВИЕ:",
+        parse_mode="Markdown",
+        reply_markup=main_keyboard()
     )
 
-# ========== ПРОФИЛЬ ==========
-@user_router.message(F.text == "👤 Профиль")
+@user_router.message(F.text == "👤 ПРОФИЛЬ")
 async def profile(message: types.Message):
     if is_banned(message.from_user.id):
-        await message.answer("❌ Вы забанены")
+        await message.answer("❌ ВЫ ЗАБАНЕНЫ")
         return
     user = get_user(message.from_user.id)
     if not user:
-        await message.answer("❌ Ошибка, попробуйте /start")
+        await message.answer("❌ ОШИБКА, ПОПРОБУЙТЕ /start")
         return
     
     active_count = get_active_requests_count(message.from_user.id)
     
     text = (
-        f"👤 **Ваш профиль**\n\n"
-        f"💰 **Баланс:** {user['balance']} USDT\n"
-        f"📋 **Активных заявок:** {active_count}\n"
-        f"📤 **Выведено всего:** {user['total_withdrawn']} USDT"
+        f"👤 **ВАШ ПРОФИЛЬ**\n\n"
+        f"💰 **БАЛАНС:** {user['balance']} USDT\n"
+        f"📋 **АКТИВНЫХ ЗАЯВОК:** {active_count}\n"
+        f"📤 **ВЫВЕДЕНО ВСЕГО:** {user['total_withdrawn']} USDT"
     )
     await message.answer(text, parse_mode="Markdown", reply_markup=profile_keyboard())
 
-# ========== ГЛАВНОЕ МЕНЮ ==========
-@user_router.message(F.text == "🔙 Главное меню")
-@user_router.message(F.text == "🏠 Главное меню")
-async def go_main_menu(message: types.Message, state: FSMContext):
+@user_router.message(F.text == "◀️ НАЗАД")
+async def back_to_main(message: types.Message, state: FSMContext):
     await state.clear()
-    await message.answer("🏠 **Главное меню**", reply_markup=main_keyboard(), parse_mode="Markdown")
+    await message.answer("◀️ ГЛАВНОЕ МЕНЮ", reply_markup=main_keyboard())
 
-@user_router.message(F.text == "🔙 Назад")
-async def back_to_profile(message: types.Message, state: FSMContext):
-    await state.clear()
-    await profile(message)
-
-# ========== ВЫВЕСТИ ==========
-@user_router.message(F.text == "💰 Вывести")
+@user_router.message(F.text == "💰 ВЫВЕСТИ")
 async def withdraw_start(message: types.Message, state: FSMContext):
     if is_banned(message.from_user.id):
         return
     user = get_user(message.from_user.id)
     if user["balance"] < 50:
-        await message.answer("❌ Минимальная сумма вывода — **50 USDT**", parse_mode="Markdown")
+        await message.answer("❌ МИНИМАЛЬНАЯ СУММА ВЫВОДА — **50 USDT**", parse_mode="Markdown")
         return
     
     await message.answer(
-        "💸 **Введите сумму вывода (от 50 USDT):**",
+        "💸 **ВВЕДИТЕ СУММУ ВЫВОДА (ОТ 50 USDT):**",
         parse_mode="Markdown",
-        reply_markup=back_keyboard()
+        reply_markup=withdraw_amount_keyboard()
     )
     await state.set_state(WithdrawState.amount)
 
 @user_router.message(WithdrawState.amount)
 async def withdraw_amount(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад":
+    if message.text == "◀️ НАЗАД":
         await state.clear()
         await profile(message)
         return
@@ -112,65 +102,47 @@ async def withdraw_amount(message: types.Message, state: FSMContext):
     try:
         amount = float(message.text)
         if amount < 50:
-            await message.answer("❌ Сумма должна быть **не менее 50 USDT**\nВведите другую сумму:", parse_mode="Markdown")
+            await message.answer("❌ СУММА ДОЛЖНА БЫТЬ **НЕ МЕНЕЕ 50 USDT**\nВВЕДИТЕ ДРУГУЮ СУММУ:", parse_mode="Markdown")
             return
         
         user = get_user(message.from_user.id)
         if amount > user["balance"]:
-            await message.answer(f"❌ У вас {user['balance']} USDT\nВведите сумму не больше баланса:", parse_mode="Markdown")
+            await message.answer(f"❌ У ВАС {user['balance']} USDT\nВВЕДИТЕ СУММУ НЕ БОЛЬШЕ БАЛАНСА:", parse_mode="Markdown")
             return
         
         await state.update_data(amount=amount)
         await message.answer(
-            "💳 **Выберите способ вывода:**\n\n"
-            "1️⃣ Карта\n"
-            "2️⃣ Crypto Bot",
+            "💳 **ВЫБЕРИТЕ СПОСОБ ВЫВОДА:**",
             parse_mode="Markdown",
-            reply_markup=types.ReplyKeyboardMarkup(
-                keyboard=[
-                    [types.KeyboardButton(text="💳 Карта")],
-                    [types.KeyboardButton(text="🤖 Crypto Bot")],
-                    [types.KeyboardButton(text="🔙 Назад")]
-                ],
-                resize_keyboard=True
-            )
+            reply_markup=withdraw_method_keyboard()
         )
         await state.set_state(WithdrawState.method)
     except:
-        await message.answer("❌ Введите число")
+        await message.answer("❌ ВВЕДИТЕ ЧИСЛО")
 
 @user_router.message(WithdrawState.method)
 async def withdraw_method(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад":
+    if message.text == "◀️ НАЗАД":
         await state.clear()
         await profile(message)
         return
     
-    if message.text == "💳 Карта":
+    if message.text == "💳 КАРТА":
         await state.update_data(method="card")
         await message.answer(
-            "💳 **Выберите тип перевода:**\n\n"
-            "1️⃣ СБП (по номеру телефона)\n"
-            "2️⃣ По номеру карты",
+            "💳 **ВЫБЕРИТЕ ТИП ПЕРЕВОДА:**",
             parse_mode="Markdown",
-            reply_markup=types.ReplyKeyboardMarkup(
-                keyboard=[
-                    [types.KeyboardButton(text="📱 СБП")],
-                    [types.KeyboardButton(text="💳 Номер карты")],
-                    [types.KeyboardButton(text="🔙 Назад")]
-                ],
-                resize_keyboard=True
-            )
+            reply_markup=withdraw_card_type_keyboard()
         )
         await state.set_state(WithdrawState.card_type)
     
-    elif message.text == "🤖 Crypto Bot":
+    elif message.text == "🤖 CRYPTO BOT":
         await state.update_data(method="crypto")
         await message.answer(
-            "🤖 **Отправьте ссылку на счёт из @CryptoBot**\n\n"
-            "1. Перейдите в @CryptoBot\n"
-            "2. Создайте счёт на оплату\n"
-            "3. Пришлите ссылку сюда:",
+            "🤖 **ОТПРАВЬТЕ ССЫЛКУ НА СЧЁТ ИЗ @CryptoBot**\n\n"
+            "1. ПЕРЕЙДИТЕ В @CryptoBot\n"
+            "2. СОЗДАЙТЕ СЧЁТ НА ОПЛАТУ\n"
+            "3. ПРИШЛИТЕ ССЫЛКУ СЮДА:",
             parse_mode="Markdown",
             reply_markup=back_keyboard()
         )
@@ -178,7 +150,7 @@ async def withdraw_method(message: types.Message, state: FSMContext):
 
 @user_router.message(WithdrawState.card_type)
 async def withdraw_card_type(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад":
+    if message.text == "◀️ НАЗАД":
         await state.clear()
         await profile(message)
         return
@@ -186,16 +158,16 @@ async def withdraw_card_type(message: types.Message, state: FSMContext):
     if message.text == "📱 СБП":
         await state.update_data(card_type="sbp")
         await message.answer(
-            "📱 **Введите номер телефона (привязанный к банку):**",
+            "📱 **ВВЕДИТЕ НОМЕР ТЕЛЕФОНА (ПРИВЯЗАННЫЙ К БАНКУ):**",
             parse_mode="Markdown",
             reply_markup=back_keyboard()
         )
         await state.set_state(WithdrawState.phone)
     
-    elif message.text == "💳 Номер карты":
+    elif message.text == "💳 НОМЕР КАРТЫ":
         await state.update_data(card_type="card_number")
         await message.answer(
-            "💳 **Введите номер карты (16 цифр):**",
+            "💳 **ВВЕДИТЕ НОМЕР КАРТЫ (16 ЦИФР):**",
             parse_mode="Markdown",
             reply_markup=back_keyboard()
         )
@@ -203,7 +175,7 @@ async def withdraw_card_type(message: types.Message, state: FSMContext):
 
 @user_router.message(WithdrawState.phone)
 async def withdraw_phone(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад":
+    if message.text == "◀️ НАЗАД":
         await state.clear()
         await profile(message)
         return
@@ -212,7 +184,7 @@ async def withdraw_phone(message: types.Message, state: FSMContext):
     if data.get("card_type") == "sbp":
         await state.update_data(phone=message.text)
         await message.answer(
-            "🏦 **Введите название вашего банка:**",
+            "🏦 **ВВЕДИТЕ НАЗВАНИЕ ВАШЕГО БАНКА:**",
             parse_mode="Markdown",
             reply_markup=back_keyboard()
         )
@@ -220,7 +192,7 @@ async def withdraw_phone(message: types.Message, state: FSMContext):
     else:
         await state.update_data(card_number=message.text)
         await message.answer(
-            "👤 **Введите имя получателя (как на карте):**",
+            "👤 **ВВЕДИТЕ ИМЯ ПОЛУЧАТЕЛЯ (КАК НА КАРТЕ):**",
             parse_mode="Markdown",
             reply_markup=back_keyboard()
         )
@@ -228,14 +200,14 @@ async def withdraw_phone(message: types.Message, state: FSMContext):
 
 @user_router.message(WithdrawState.bank)
 async def withdraw_bank(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад":
+    if message.text == "◀️ НАЗАД":
         await state.clear()
         await profile(message)
         return
     
     await state.update_data(bank=message.text)
     await message.answer(
-        "👤 **Введите имя получателя:**",
+        "👤 **ВВЕДИТЕ ИМЯ ПОЛУЧАТЕЛЯ:**",
         parse_mode="Markdown",
         reply_markup=back_keyboard()
     )
@@ -243,7 +215,7 @@ async def withdraw_bank(message: types.Message, state: FSMContext):
 
 @user_router.message(WithdrawState.name)
 async def withdraw_name(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад":
+    if message.text == "◀️ НАЗАД":
         await state.clear()
         await profile(message)
         return
@@ -253,7 +225,7 @@ async def withdraw_name(message: types.Message, state: FSMContext):
 
 @user_router.message(WithdrawState.crypto_link)
 async def withdraw_crypto_link(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад":
+    if message.text == "◀️ НАЗАД":
         await state.clear()
         await profile(message)
         return
@@ -268,11 +240,11 @@ async def finish_withdraw(message: types.Message, state: FSMContext):
     
     if method == "card":
         if data.get("card_type") == "sbp":
-            details = f"СБП\nТелефон: {data['phone']}\nБанк: {data['bank']}\nИмя: {data['name']}"
+            details = f"СБП\nТЕЛЕФОН: {data['phone']}\nБАНК: {data['bank']}\nИМЯ: {data['name']}"
         else:
-            details = f"Номер карты: {data['card_number']}\nИмя: {data['name']}"
+            details = f"НОМЕР КАРТЫ: {data['card_number']}\nИМЯ: {data['name']}"
     else:
-        details = f"Crypto Bot ссылка: {data['crypto_link']}"
+        details = f"CRYPTO BOT ССЫЛКА: {data['crypto_link']}"
     
     withdraw = {
         "id": int(datetime.now().timestamp()),
@@ -286,55 +258,54 @@ async def finish_withdraw(message: types.Message, state: FSMContext):
     }
     add_withdraw(withdraw)
     
+    from keyboards import withdraw_action_keyboard
     await notify_admins(
         message.bot,
-        f"💰 **Новая заявка на вывод!**\n\n"
-        f"👤 От: @{message.from_user.username}\n"
-        f"💵 Сумма: {amount} USDT\n"
-        f"💳 Способ: {method}\n"
-        f"📝 Реквизиты: {details}",
+        f"💰 **НОВАЯ ЗАЯВКА НА ВЫВОД!**\n\n"
+        f"👤 ОТ: @{message.from_user.username}\n"
+        f"💵 СУММА: {amount} USDT\n"
+        f"💳 СПОСОБ: {method}\n"
+        f"📝 РЕКВИЗИТЫ:\n{details}",
         withdraw_action_keyboard(withdraw["id"])
     )
     
     await message.answer(
-        f"✅ **Заявка на вывод {amount} USDT отправлена!**\n\n"
-        f"⏳ Статус: **В ожидании**\n"
-        f"Администратор рассмотрит её в ближайшее время.",
+        f"✅ **ЗАЯВКА НА ВЫВОД {amount} USDT ОТПРАВЛЕНА!**\n\n"
+        f"⏳ СТАТУС: **В ОЖИДАНИИ**\n"
+        f"АДМИНИСТРАТОР РАССМОТРИТ ЕЁ В БЛИЖАЙШЕЕ ВРЕМЯ.",
         parse_mode="Markdown",
         reply_markup=main_keyboard()
     )
     
     await state.clear()
 
-# ========== СПИСОК ЗАЯВОК ==========
-@user_router.message(F.text == "📋 Список заявок")
+@user_router.message(F.text == "📋 МОИ ЗАЯВКИ")
 async def list_user_withdraws(message: types.Message):
     if is_banned(message.from_user.id):
         return
     withdraws = get_user_withdraws(message.from_user.id)
     if not withdraws:
-        await message.answer("📭 **У вас нет заявок на вывод**", parse_mode="Markdown", reply_markup=profile_keyboard())
+        await message.answer("📭 **У ВАС НЕТ ЗАЯВОК НА ВЫВОД**", parse_mode="Markdown", reply_markup=profile_keyboard())
         return
     
     withdraws.reverse()
-    text = "📋 **Ваши заявки на вывод:**\n\n"
-    status_map = {"pending": "⏳ В ожидании", "approved": "✅ Одобрено", "rejected": "❌ Отклонено"}
+    text = "📋 **ВАШИ ЗАЯВКИ НА ВЫВОД:**\n\n"
+    status_map = {"pending": "⏳ В ОЖИДАНИИ", "approved": "✅ ОДОБРЕНО", "rejected": "❌ ОТКЛОНЕНО"}
     
     for w in withdraws[:10]:
-        text += f"• {w['amount']} USDT - {status_map.get(w['status'], '⏳ В ожидании')} - {w['created_at'][:10]}\n"
+        text += f"• {w['amount']} USDT - {status_map.get(w['status'], '⏳ В ОЖИДАНИИ')} - {w['created_at'][:10]}\n"
     
     if len(withdraws) > 10:
-        text += f"\n📊 *Показаны последние 10 из {len(withdraws)}*"
+        text += f"\n📊 *ПОКАЗАНЫ ПОСЛЕДНИЕ 10 ИЗ {len(withdraws)}*"
     
     await message.answer(text, parse_mode="Markdown", reply_markup=profile_keyboard())
 
-# ========== ОСТАВИТЬ ОТЗЫВ ==========
-@user_router.message(F.text == "📝 Оставить отзыв")
+@user_router.message(F.text == "📝 ОТЗЫВ")
 async def review_start(message: types.Message, state: FSMContext):
     if is_banned(message.from_user.id):
         return
     await message.answer(
-        "⭐ **Оцените наш сервис от 1 до 5:**",
+        "⭐ **ОЦЕНИТЕ НАШ СЕРВИС ОТ 1 ДО 5:**",
         parse_mode="Markdown",
         reply_markup=rating_keyboard()
     )
@@ -342,9 +313,9 @@ async def review_start(message: types.Message, state: FSMContext):
 
 @user_router.message(ReviewState.rating)
 async def review_rating(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад":
+    if message.text == "◀️ НАЗАД":
         await state.clear()
-        await go_main_menu(message, state)
+        await start(message)
         return
     
     rating_map = {
@@ -353,13 +324,13 @@ async def review_rating(message: types.Message, state: FSMContext):
     }
     
     if message.text not in rating_map:
-        await message.answer("❌ Пожалуйста, выберите оценку из кнопок")
+        await message.answer("❌ ПОЖАЛУЙСТА, ВЫБЕРИТЕ ОЦЕНКУ ИЗ КНОПОК")
         return
     
     rating = rating_map[message.text]
     await state.update_data(rating=rating)
     await message.answer(
-        "💬 **Напишите ваш комментарий (или нажмите «Пропустить»):**",
+        "💬 **НАПИШИТЕ ВАШ КОММЕНТАРИЙ (ИЛИ НАЖМИТЕ «ПРОПУСТИТЬ»):**",
         parse_mode="Markdown",
         reply_markup=review_skip_keyboard()
     )
@@ -367,14 +338,14 @@ async def review_rating(message: types.Message, state: FSMContext):
 
 @user_router.message(ReviewState.comment)
 async def review_comment(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад":
+    if message.text == "◀️ НАЗАД":
         await state.clear()
         await review_start(message, state)
         return
     
     data = await state.get_data()
     rating = data["rating"]
-    comment = None if message.text == "⏩ Пропустить" else message.text
+    comment = None if message.text == "⏩ ПРОПУСТИТЬ" else message.text
     
     review = {
         "id": int(datetime.now().timestamp()),
@@ -386,13 +357,12 @@ async def review_comment(message: types.Message, state: FSMContext):
     }
     add_review(review)
     
-    # Отправка в канал
     stars = "⭐" * rating
     channel_text = (
-        f"⭐ **Новый отзыв!**\n\n"
-        f"👤 От: @{message.from_user.username}\n"
-        f"⭐ Оценка: {rating}/5 {stars}\n"
-        f"💬 Комментарий: {comment or 'Без комментария'}\n"
+        f"⭐ **НОВЫЙ ОТЗЫВ!**\n\n"
+        f"👤 ОТ: @{message.from_user.username}\n"
+        f"⭐ ОЦЕНКА: {rating}/5 {stars}\n"
+        f"💬 КОММЕНТАРИЙ: {comment or 'БЕЗ КОММЕНТАРИЯ'}\n"
         f"📅 {datetime.now().strftime('%d.%m.%Y %H:%M')}"
     )
     try:
@@ -400,67 +370,64 @@ async def review_comment(message: types.Message, state: FSMContext):
     except:
         pass
     
-    # Уведомление админам
     await notify_admins(
         message.bot,
-        f"⭐ **Новый отзыв!**\n\n"
-        f"👤 От: @{message.from_user.username}\n"
-        f"⭐ Оценка: {rating}/5\n"
-        f"💬 Комментарий: {comment or 'Нет'}"
+        f"⭐ **НОВЫЙ ОТЗЫВ!**\n\n"
+        f"👤 ОТ: @{message.from_user.username}\n"
+        f"⭐ ОЦЕНКА: {rating}/5\n"
+        f"💬 КОММЕНТАРИЙ: {comment or 'НЕТ'}"
     )
     
     await state.clear()
     await message.answer(
-        "✅ **Спасибо за ваш отзыв!**\n"
-        "Мы ценим ваше мнение.",
+        "✅ **СПАСИБО ЗА ВАШ ОТЗЫВ!**\n"
+        "МЫ ЦЕНИМ ВАШЕ МНЕНИЕ.",
         parse_mode="Markdown",
         reply_markup=main_keyboard()
     )
 
-# ========== ПОДДЕРЖКА ==========
-@user_router.message(F.text == "🆘 Поддержка")
+@user_router.message(F.text == "🆘 ПОДДЕРЖКА")
 async def support(message: types.Message):
     if is_banned(message.from_user.id):
         return
     await message.answer(
-        "📞 **Связь с администратором**\n\n"
-        "Напишите ваш вопрос, и мы ответим вам в ближайшее время.",
+        "📞 **СВЯЗЬ С АДМИНИСТРАТОРОМ**\n\n"
+        "НАПИШИТЕ ВАШ ВОПРОС, И МЫ ОТВЕТИМ ВАМ В БЛИЖАЙШЕЕ ВРЕМЯ.",
         parse_mode="Markdown",
-        reply_markup=cancel_keyboard()
+        reply_markup=support_keyboard()
     )
+
+@user_router.message(F.text == "ℹ️ ИНФО")
+async def info(message: types.Message):
+    text = (
+        "ℹ️ **ИНФОРМАЦИЯ**\n\n"
+        "🕒 **ГРАФИК РАБОТЫ:**\n"
+        "ПН-ПТ С 11:00 ДО 19:30\n\n"
+        "💸 **ВЫВОД СРЕДСТВ:**\n"
+        "ПРОИЗВОДИТСЯ С 11:00 ДО 19:30\n\n"
+        "💰 **МИНИМАЛЬНАЯ СУММА ВЫВОДА:** 50 USDT\n\n"
+        "📞 **ПО ВСЕМ ВОПРОСАМ:** /admin"
+    )
+    await message.answer(text, parse_mode="Markdown", reply_markup=main_keyboard())
 
 @user_router.message(F.text)
 async def support_message(message: types.Message):
     if is_banned(message.from_user.id):
         return
-    if message.text in ["👤 Профиль", "📝 Оставить отзыв", "🆘 Поддержка", "ℹ️ ИНФО", "🔙 Назад", "🔙 Главное меню", "🏠 Главное меню", "💰 Вывести", "📋 Список заявок", "❌ Отмена", "⭐ 1", "⭐⭐ 2", "⭐⭐⭐ 3", "⭐⭐⭐⭐ 4", "⭐⭐⭐⭐⭐ 5", "⏩ Пропустить"]:
-        return
     if message.from_user.id in ADMIN_IDS:
+        return
+    if message.text in ["👤 ПРОФИЛЬ", "📝 ОТЗЫВ", "🆘 ПОДДЕРЖКА", "ℹ️ ИНФО", "◀️ НАЗАД", "💰 ВЫВЕСТИ", "📋 МОИ ЗАЯВКИ", "⭐ 1", "⭐⭐ 2", "⭐⭐⭐ 3", "⭐⭐⭐⭐ 4", "⭐⭐⭐⭐⭐ 5", "⏩ ПРОПУСТИТЬ", "💳 КАРТА", "🤖 CRYPTO BOT", "📱 СБП", "💳 НОМЕР КАРТЫ"]:
         return
     
     await notify_admins(
         message.bot,
-        f"🆘 **Вопрос от пользователя!**\n\n"
-        f"👤 От: @{message.from_user.username}\n"
-        f"📝 Сообщение: {message.text}"
+        f"🆘 **ВОПРОС ОТ ПОЛЬЗОВАТЕЛЯ!**\n\n"
+        f"👤 ОТ: @{message.from_user.username}\n"
+        f"📝 СООБЩЕНИЕ: {message.text}"
     )
     await message.answer(
-        "✅ **Сообщение отправлено!**\n"
-        "Администратор ответит вам в ближайшее время.",
+        "✅ **СООБЩЕНИЕ ОТПРАВЛЕНО!**\n"
+        "АДМИНИСТРАТОР ОТВЕТИТ ВАМ В БЛИЖАЙШЕЕ ВРЕМЯ.",
         parse_mode="Markdown",
         reply_markup=main_keyboard()
     )
-
-# ========== ИНФО ==========
-@user_router.message(F.text == "ℹ️ ИНФО")
-async def info(message: types.Message):
-    text = (
-        "ℹ️ **ИНФОРМАЦИЯ**\n\n"
-        "🕒 **График работы:**\n"
-        "ПН-ПТ с 11:00 до 19:30\n\n"
-        "💸 **Вывод средств:**\n"
-        "Производится с 11:00 до 19:30\n\n"
-        "💰 **Минимальная сумма вывода:** 50 USDT\n\n"
-        "📞 **По всем вопросам:** /admin"
-    )
-    await message.answer(text, parse_mode="Markdown", reply_markup=main_keyboard())
