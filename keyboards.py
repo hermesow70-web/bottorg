@@ -3,8 +3,8 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 def main_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="👤 ПРОФИЛЬ"), KeyboardButton(text="📝 ОТЗЫВ")],
-            [KeyboardButton(text="🆘 ПОДДЕРЖКА"), KeyboardButton(text="ℹ️ ИНФО")]
+            [KeyboardButton(text="👤 Профиль"), KeyboardButton(text="📝 Отзыв")],
+            [KeyboardButton(text="🆘 Поддержка"), KeyboardButton(text="ℹ️ Инфо")]
         ],
         resize_keyboard=True
     )
@@ -12,9 +12,9 @@ def main_keyboard():
 def profile_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="💰 ВЫВЕСТИ")],
-            [KeyboardButton(text="📋 МОИ ЗАЯВКИ")],
-            [KeyboardButton(text="◀️ НАЗАД")]
+            [KeyboardButton(text="💰 Вывести")],
+            [KeyboardButton(text="📋 Мои заявки")],
+            [KeyboardButton(text="◀️ Назад")]
         ],
         resize_keyboard=True
     )
@@ -22,10 +22,10 @@ def profile_keyboard():
 def admin_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="👥 БАН/РАЗБАН")],
-            [KeyboardButton(text="📋 ЗАЯВКИ")],
-            [KeyboardButton(text="💰 БАЛАНС")],
-            [KeyboardButton(text="◀️ НАЗАД")]
+            [KeyboardButton(text="👥 Бан/Разбан")],
+            [KeyboardButton(text="📋 Заявки")],
+            [KeyboardButton(text="💰 Баланс")],
+            [KeyboardButton(text="◀️ Назад")]
         ],
         resize_keyboard=True
     )
@@ -33,9 +33,10 @@ def admin_keyboard():
 def balance_admin_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="➕ НАЧИСЛИТЬ"), KeyboardButton(text="➖ СПИСАТЬ")],
-            [KeyboardButton(text="🔄 ОБНУЛИТЬ")],
-            [KeyboardButton(text="◀️ НАЗАД")]
+            [KeyboardButton(text="➕ Начислить")],
+            [KeyboardButton(text="➖ Списать")],
+            [KeyboardButton(text="🔄 Обнулить")],
+            [KeyboardButton(text="◀️ Назад")]
         ],
         resize_keyboard=True
     )
@@ -43,30 +44,31 @@ def balance_admin_keyboard():
 def ban_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🔨 ЗАБАНИТЬ"), KeyboardButton(text="🔓 РАЗБАНИТЬ")],
-            [KeyboardButton(text="◀️ НАЗАД")]
+            [KeyboardButton(text="🔨 Забанить")],
+            [KeyboardButton(text="🔓 Разбанить")],
+            [KeyboardButton(text="◀️ Назад")]
         ],
         resize_keyboard=True
     )
 
 def back_keyboard():
     return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="◀️ НАЗАД")]],
+        keyboard=[[KeyboardButton(text="◀️ Назад")]],
         resize_keyboard=True
     )
 
 def withdraw_amount_keyboard():
     return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="◀️ НАЗАД")]],
+        keyboard=[[KeyboardButton(text="◀️ Назад")]],
         resize_keyboard=True
     )
 
 def withdraw_method_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="💳 КАРТА")],
-            [KeyboardButton(text="🤖 CRYPTO BOT")],
-            [KeyboardButton(text="◀️ НАЗАД")]
+            [KeyboardButton(text="💳 Карта")],
+            [KeyboardButton(text="🤖 Crypto Bot")],
+            [KeyboardButton(text="◀️ Назад")]
         ],
         resize_keyboard=True
     )
@@ -75,8 +77,8 @@ def withdraw_card_type_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📱 СБП")],
-            [KeyboardButton(text="💳 НОМЕР КАРТЫ")],
-            [KeyboardButton(text="◀️ НАЗАД")]
+            [KeyboardButton(text="💳 Номер карты")],
+            [KeyboardButton(text="◀️ Назад")]
         ],
         resize_keyboard=True
     )
@@ -86,7 +88,7 @@ def rating_keyboard():
         keyboard=[
             [KeyboardButton(text="⭐ 1"), KeyboardButton(text="⭐⭐ 2"), KeyboardButton(text="⭐⭐⭐ 3")],
             [KeyboardButton(text="⭐⭐⭐⭐ 4"), KeyboardButton(text="⭐⭐⭐⭐⭐ 5")],
-            [KeyboardButton(text="◀️ НАЗАД")]
+            [KeyboardButton(text="◀️ Назад")]
         ],
         resize_keyboard=True
     )
@@ -94,23 +96,26 @@ def rating_keyboard():
 def review_skip_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="⏩ ПРОПУСТИТЬ")],
-            [KeyboardButton(text="◀️ НАЗАД")]
+            [KeyboardButton(text="⏩ Пропустить")],
+            [KeyboardButton(text="◀️ Назад")]
         ],
         resize_keyboard=True
     )
 
-def support_keyboard():
-    return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="◀️ НАЗАД")]],
-        resize_keyboard=True
+def review_anonymous_keyboard():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="📢 Отправить с именем", callback_data="review_named")],
+            [InlineKeyboardButton(text="👤 Отправить анонимно", callback_data="review_anonymous")],
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="review_cancel")]
+        ]
     )
 
 def withdraw_action_keyboard(wid):
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="✅ ОДОБРИТЬ", callback_data=f"approve_{wid}")],
-            [InlineKeyboardButton(text="❌ ОТКЛОНИТЬ", callback_data=f"reject_{wid}")],
-            [InlineKeyboardButton(text="💬 ОТВЕТИТЬ", callback_data=f"reply_{wid}")]
+            [InlineKeyboardButton(text="✅ Одобрить", callback_data=f"approve_{wid}")],
+            [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject_{wid}")],
+            [InlineKeyboardButton(text="💬 Ответить", callback_data=f"reply_{wid}")]
         ]
             )
