@@ -11,7 +11,8 @@ router = Router()
 
 # Проверка бана
 async def check_ban(user_id):
-    if is_banned(user_id):
+    user = get_user(user_id)
+    if user and user[3] == 1:
         return True
     return False
 
@@ -38,14 +39,16 @@ async def start(message: types.Message):
 
 @router.callback_query(F.data == "consent_agree")
 async def consent_handler(callback: types.CallbackQuery):
-    set_consent(callback.from_user.id)
+    user_id = callback.from_user.id
+    set_consent(user_id)
     
-    # Уведомление админам о новом пользователе (только кто нажал согласен)
+    # Уведомление админам о новом пользователе
     for admin_id in ADMIN_IDS:
         try:
             await callback.bot.send_message(
                 admin_id, 
-                f"🆕 *Новый пользователь*\n\n👤 Username: @{callback.from_user.username or 'нет username'}\n🆔 ID: `{callback.from_user.id}`\n✅ Согласие получено!"
+                f"🆕 *Новый пользователь*\n\n👤 Username: @{callback.from_user.username or 'нет username'}\n🆔 ID: `{user_id}`\n✅ Согласие получено!",
+                parse_mode="Markdown"
             )
         except:
             pass
@@ -66,32 +69,51 @@ async def show_welcome(event):
 async def main_menu(callback: types.CallbackQuery):
     await show_welcome(callback)
 
-# === ПРОФИЛЬ ===
+# === ПРОФИЛЬ (ИСПРАВЛЕННЫЙ) ===
 @router.callback_query(F.data == "profile")
 async def profile(callback: types.CallbackQuery):
-    if await check_ban(callback.from_user.id):
+    user_id = callback.from_user.id
+    
+    # Проверка бана
+    if await check_ban(user_id):
         await callback.message.edit_text("❌ Вы забанены! Обратитесь к администратору.")
         await callback.answer()
         return
     
-    user = get_user(callback.from_user.id)
+    # Получаем пользователя из БД
+    user = get_user(user_id)
     if not user:
-        await callback.answer("Ошибка", show_alert=True)
-        return
-    text = f"👤 *Ваш профиль*\n\n📝 Username: @{user[1]}\n💰 Баланс: {user[2]} USDT\n⏳ Заявок в ожидании: {get_pending_withdrawals_count(callback.from_user.id)}"
-    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=get_profile_keyboard())
+        # Если пользователь не найден — добавляем
+        add_user(user_id, callback.from_user.username or "нет username")
+        user = get_user(user_id)
+    
+    username = user[1] or "нет username"
+    balance = user[2]
+    pending_count = get_pending_withdrawals_count(user_id)
+    
+    text = f"👤 *Ваш профиль*\n\n📝 Username: @{username}\n💰 Баланс: {balance} USDT\n⏳ Заявок в ожидании: {pending_count}"
+    
+    try:
+        await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=get_profile_keyboard())
+    except Exception as e:
+        # Если не удалось отредактировать — отправляем новое сообщение
+        await callback.message.answer(text, parse_mode="Markdown", reply_markup=get_profile_keyboard())
+    
     await callback.answer()
 
 # === СПИСОК ЗАЯВОК ===
 @router.callback_query(F.data == "my_withdrawals")
 async def my_withdrawals(callback: types.CallbackQuery, state: FSMContext):
-    if await check_ban(callback.from_user.id):
+    user_id = callback.from_user.id
+    
+    if await check_ban(user_id):
         await callback.message.edit_text("❌ Вы забанены! Обратитесь к администратору.")
         await callback.answer()
         return
     
-    page = (await state.get_data()).get('page', 0)
-    withdrawals, total = get_user_withdrawals(callback.from_user.id, page)
+    data = await state.get_data()
+    page = data.get('page', 0)
+    withdrawals, total = get_user_withdrawals(user_id, page)
     
     if not withdrawals:
         await callback.message.edit_text("📭 У вас пока нет заявок на вывод", reply_markup=get_profile_keyboard())
@@ -131,6 +153,3 @@ async def withdrawals_prev(callback: types.CallbackQuery, state: FSMContext):
     page = max(0, data.get('page', 0) - 1)
     await state.update_data(page=page)
     await my_withdrawals(callback, state)
-
-# === ОСТАЛЬНЫЕ ОБРАБОТЧИКИ (withdraw, review, support) с проверкой бана ===
-# Добавьте await check_ban() в начало каждого обработчика
