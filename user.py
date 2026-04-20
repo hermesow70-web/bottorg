@@ -1,10 +1,11 @@
 from aiogram import Router, F, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import MIN_WITHDRAW
 from database import get_user, get_pending_withdrawals_count, check_consent, set_consent, add_user
-from keyboards import get_main_menu, get_profile_keyboard, get_rating_keyboard
-from utils import WithdrawStates, ReviewStates, SupportStates
+from keyboards import get_main_menu, get_profile_keyboard
+from util import WithdrawStates, ReviewStates, SupportStates
 
 router = Router()
 
